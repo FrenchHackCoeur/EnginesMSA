@@ -31,8 +31,8 @@ class DialogTopics:
 
         return random.choice(topics_)
 
-    def delete_topic(self, topic_id):
+    def delete_topic(self, topic: 'Item'):
         """
         Delete a topic that has been discussed
         """
-        self._topics.remove(topic_id)
+        self._topics.remove(topic)

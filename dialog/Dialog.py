@@ -13,13 +13,13 @@ class Dialog:
         """
         return self._description
 
-    def add_interlocutor(self, interlocutor_id):
+    def add_interlocutor(self, interlocutor_id: str):
         """
         Add an interlocutor
         """
         self._dialogs[interlocutor_id] = None  # Specialised classes will take care of it
 
-    def remove_interlocutor(self, interlocutor_id):
+    def remove_interlocutor(self, interlocutor_id: str):
         """
         Delete an interlocutor we would be able to talk with.
         """

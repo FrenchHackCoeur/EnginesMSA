@@ -12,6 +12,9 @@ from preferences.CriterionValue import CriterionValue
 from preferences.Item import Item
 from preferences.Value import Value
 
+from role.Role import Role
+from role.DirectoryFaciliator import DirectoryFacilitator
+
 from dialog.EnginesDialog import EnginesDialog
 
 from typing import List
@@ -23,16 +26,12 @@ class ArgumentAgent(CommunicatingAgent):
     ArgumentAgent which inherit from CommunicatingAgent.
     """
 
-    def __init__(self, unique_id, model, name, engine_models: List[Item]):
+    def __init__(self, unique_id, model: 'ArgumentModel', name, engine_models: List[Item]):
         super().__init__(unique_id, model, name)
         self.preference = self.generate_preferences(engine_models, CriterionName.to_list())
         self._dialog = EnginesDialog(engine_models)
         self.announce_existence_to_the_world = False
-
-    def step(self):
-        super().step()
-
-        # Checking if the agent received a message
+        self._df = model.get_directory_facilitator()
 
     def get_preference(self):
         return self.preference
@@ -58,115 +57,73 @@ class ArgumentAgent(CommunicatingAgent):
 
         return preference
 
-
-class AliceAgent(ArgumentAgent):
-    def __init__(self, unique_id, model, engine_models: List[Item]):
-        super().__init__(unique_id, model, "Alice", engine_models)
-
     def step(self):
-        # Alice first checks if she already discuses with Bob
-        if self._dialog.is_not_an_interlocutor("Bob"):
-            self._dialog.add_interlocutor("Bob")
+        # Get a list of interlocutors with which the agent can talk about engines
+        engines_interlocutors = self._df.get_agents_with_specific_role(self, Role.EnginesTalker)
 
-        # Alice checks if she has received new messages
-        messages = self.get_new_messages()
+        # We iterate through the interlocutors
+        for interlocutor in engines_interlocutors:
+            # We check if we have already discussed with this interlocutor before
+            if self._dialog.is_not_an_interlocutor(interlocutor):
+                self._dialog.add_interlocutor(interlocutor)
 
-        if len(messages) > 0:
-            # We iterate through the messages
-            for message in messages:
-                # We have to check that the only message she has received is from Bob
-                if message.get_exp() == "Bob":
-                    # She will now determine the current step of the protocol she has established with Bob
-                    performative = message.get_performative()
+        # We then iterate through the messages
+        new_messages = self.get_new_messages()
 
-                    if performative == MessagePerformative.ACCEPT:
-                        # We get the engine Alice has been talking about with Bob
-                        engine = message.get_content()
+        for message in new_messages:
+            # We retrieve the expeditor
+            expeditor = message.get_exp()
 
-                        # She will notify Bob with a commit message
-                        self.send_message(Message(
-                            self.get_name(),
-                            message.get_exp(),
-                            MessagePerformative.COMMIT,
-                            engine
-                        ))
+            # We now check the performative of the message and answer
+            performative = message.get_performative()
 
-                        # She can now update her believe base (discussion items)
-                        self._dialog.get_dialog_with_agent(message.get_exp()).delete_topic(engine)
-                    elif performative == MessagePerformative.ASK_WHY:
-                        # She should begin to argue
-                        pass
+            if performative == MessagePerformative.PROPOSE:
+                # We get the engine proposed by an agent
+                engine = message.get_content()
 
-        else:
-            # Alice sends a message to Bob to propose an engine that has not been discussed yet
-            engine = self._dialog.get_dialog_with_agent("Bob").get_random_topic()
-
-            if engine is not None:
-                self.send_message(
-                    Message(
+                # We check if the engine proposed is one of our preferred ones
+                if self.preference.is_item_among_top_10_percent(engine, self._dialog.get_engines()):
+                    self.send_message(Message(
                         self.get_name(),
-                        "Bob",
+                        expeditor,
+                        MessagePerformative.ACCEPT,
+                        engine
+                    ))
+                else:
+                    # Otherwise the agent will ask why the other agent proposed this engine
+                    self.send_message(Message(
+                        self.get_name(),
+                        expeditor,
+                        MessagePerformative.ASK_WHY,
+                        engine
+                    ))
+            elif performative == MessagePerformative.COMMIT:
+                # We retrieved the engine mentioned in the protocol
+                engine = message.get_content()
+
+                # The agent can now delete the engine from his/her list of engines that have not been discussed with
+                # the other agent
+                self._dialog.get_dialog_with_agent(expeditor).delete_topic(engine)
+
+            # We can now remove the interlocutor from our list of interlocutors since we have spoken with him/her
+            engines_interlocutors.remove(expeditor)
+
+        # We now iterate through the list of interlocutors we have not received a message
+        for interlocutor in engines_interlocutors:
+            # We check if we should send a PROPOSE message by checking the latest message receive from this agent
+            messages = self.get_messages_from_exp(interlocutor)
+
+            if len(messages) == 0 or messages[0].get_performative() == MessagePerformative.COMMIT:
+                # We now check if we can talk about an engine that has not been discussed before
+                engine = self._dialog.get_dialog_with_agent(interlocutor).get_random_topic()
+
+                if engine is not None:
+                    self.send_message(Message(
+                        self.get_name(),
+                        interlocutor,
                         MessagePerformative.PROPOSE,
                         engine
-                    )
-                )
-
-
-class BobAgent(ArgumentAgent):
-    def __init__(self, unique_id, model, engine_models: List[Item]):
-        super().__init__(unique_id, model, "Bob", engine_models)
-
-    def step(self):
-        # Bob checks if he has received new messages
-        messages = self.get_new_messages()
-
-        if len(messages) > 0:
-            # We iterate through the messages
-            for message in messages:
-                # Bob first checks the expeditor of the message to determine if it's an interlocutor with which he has
-                # discussed
-                interlocutor = message.get_exp()
-
-                if self._dialog.is_not_an_interlocutor(interlocutor):
-                    self._dialog.add_interlocutor(interlocutor)
-
-                # Then he checks if it's Alice:
-                if interlocutor == "Alice":
-                    # If it's the case, he should determine what he has to do
-                    performative = message.get_performative()
-
-                    if performative == MessagePerformative.PROPOSE:
-                        # Bob is about to check if the engine proposed by Alice is one of his preferred ones
-                        engine = message.get_content()
-
-                        if self.preference.is_item_among_top_10_percent(engine, self._dialog.get_engines()):
-                            self.send_message(Message(
-                                self.get_name(),
-                                message.get_exp(),
-                                MessagePerformative.ACCEPT,
-                                engine
-                            ))
-                        else:
-                            # Otherwise he will ask Alice to justify her choice
-                            self.send_message(Message(
-                                self.get_name(),
-                                message.get_exp(),
-                                MessagePerformative.ASK_WHY,
-                                engine
-                            ))
-                    elif performative == MessagePerformative.COMMIT:
-                        engine = message.get_content()
-
-                        # Bob notifies Alice that he will update his topics of discussion with her
-                        self.send_message(Message(
-                            self.get_name(),
-                            message.get_exp(),
-                            MessagePerformative.COMMIT,
-                            engine
-                        ))
-
-                        # Bob can update his topics of discussion with Alice
-                        self._dialog.get_dialog_with_agent(message.get_exp()).delete_topic(engine)
+                    ))
 
 
 class ArgumentModel(Model):
@@ -178,10 +135,16 @@ class ArgumentModel(Model):
         super().__init__()
         self.schedule = RandomActivation(self)
         self.__messages_service = MessageService(self.schedule)
+        self._df = DirectoryFacilitator()
+        self._df.add_role(Role.EnginesTalker)
         self.running = True
+
+    def get_directory_facilitator(self):
+        return self._df
 
     def add_agent(self, agent: ArgumentAgent):
         self.schedule.add(agent)
+        self._df.attach_a_role_to_agent(Role.EnginesTalker, agent.get_name())
 
     def step(self):
         self.__messages_service.dispatch_messages()
@@ -205,12 +168,12 @@ if __name__ == "__main__":
     argument_model = ArgumentModel()
 
     # Creating our agents
-    alice = AliceAgent(1, argument_model, engines)
-    bob = BobAgent(2, argument_model, engines)
+    alice = ArgumentAgent(1, argument_model, "Alice", engines)
+    bob = ArgumentAgent(2, argument_model, "Bob", engines)
 
     # Adding our agents to our model
     argument_model.add_agent(alice)
     argument_model.add_agent(bob)
 
     # Running
-    argument_model.run_n_step(10)
+    argument_model.run_n_step(5)
