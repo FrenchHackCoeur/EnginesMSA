@@ -1,8 +1,6 @@
 from typing import List, Set, Union, TYPE_CHECKING
 import random
-
-if TYPE_CHECKING:
-    from preferences import Item
+from preferences.Item import Item
 
 
 class DialogTopics:
@@ -36,3 +34,23 @@ class DialogTopics:
         Delete a topic that has been discussed
         """
         self._topics.remove(topic)
+
+
+if __name__ == '__main__':
+    plane = Item("Plane", "Plane")
+    car = Item("Car", "Car")
+    topics = DialogTopics([plane, car])
+
+    topic = topics.get_random_topic()
+
+    assert topic is not None
+    assert type(topic) == Item
+    print("[INFO] Checking choosing random topic... OK")
+
+    topics.delete_topic(car)
+    topics.delete_topic(plane)
+
+    topic = topics.get_random_topic()
+
+    assert topic is None
+    print("[INFO] Checking delete function... OK")

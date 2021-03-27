@@ -1,6 +1,7 @@
 from typing import List
 from dialog.DialogTopics import DialogTopics
 
+
 class Dialog:
     def __init__(self, description):
         # Permits to understand what the agents will be talking about
@@ -48,3 +49,36 @@ class Dialog:
             return True
 
 
+if __name__ == '__main__':
+    description = "A dialog about life"
+    dialog = Dialog(description)
+
+    assert dialog.get_dialog_description() == description
+    print("[INFO] Method to return the description of the dialog... OK")
+
+    # Test adding an interlocutor
+    interlocutor = "AgentSmith"
+
+    dialog.add_interlocutor(interlocutor)
+
+    interlocutors = dialog.get_interlocutors()
+    assert len(interlocutors) == 1
+    assert interlocutors[0] == interlocutor
+    print("[INFO] Method to add an interlocutor and to return interlocutors... OK")
+
+    # Test to remove an interlocutor
+    dialog.remove_interlocutor(interlocutor)
+    interlocutors = dialog.get_interlocutors()
+
+    assert len(interlocutors) == 0
+    print("[INFO] Method to delete an interlocutor... OK")
+
+    # Testing the function that indicates if we are already discussing with a specific agent
+    dialog.add_interlocutor(interlocutor)
+    answer_1 = dialog.is_not_an_interlocutor(interlocutor)
+    answer_2 = dialog.is_not_an_interlocutor("AgentPamela")
+
+    assert answer_1 is False
+    assert answer_2 is True
+
+    print("[INFO] Testing the method that indicates whether or not we are already discussing with an agent... OK")

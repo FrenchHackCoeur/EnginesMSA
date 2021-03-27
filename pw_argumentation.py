@@ -59,7 +59,7 @@ class ArgumentAgent(CommunicatingAgent):
 
     def step(self):
         # Get a list of interlocutors with which the agent can talk about engines
-        engines_interlocutors = self._df.get_agents_with_specific_role(self, Role.EnginesTalker)
+        engines_interlocutors = self._df.get_agents_with_specific_role(self.get_name(), Role.EnginesTalker)
 
         # We iterate through the interlocutors
         for interlocutor in engines_interlocutors:
