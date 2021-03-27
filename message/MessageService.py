@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+
 class MessageService:
     """MessageService class.
     Class implementing the message service used to dispatch messages between communicating agents.
@@ -41,6 +42,7 @@ class MessageService:
         if self.__instant_delivery:
             # We print the message
             self.dispatch_message(message)
+
         else:
             self.__messages_to_proceed.append(message)
 

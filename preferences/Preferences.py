@@ -22,7 +22,6 @@ class Preferences:
         """
         self.__criterion_name_list = []
         self.__criterion_value_list = []
-        self._items = set()
 
     def get_criterion_name_list(self):
         """Returns the list of criterion name.
@@ -38,30 +37,6 @@ class Preferences:
         """Sets the list of criterion name.
         """
         self.__criterion_name_list = criterion_name_list
-
-    def add_items(self, arr: List[Item]):
-        """
-        Fill the property items
-        """
-        for item in arr:
-            self._items.add(item)
-
-    def choose_item_randomly(self) -> Item:
-        """
-        Function to choose an item randomly
-        """
-        return random.choice(list(self._items))
-
-    def remove_item(self, item: Item):
-        """
-        Remove an item from our preferences
-        """
-
-    def get_items(self) -> List[Item]:
-        """
-        Returns items
-        """
-        return list(self._items)
 
     def add_criterion_value(self, criterion_value):
         """Adds a criterion value in the list.
