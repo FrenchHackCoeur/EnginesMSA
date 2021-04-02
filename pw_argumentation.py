@@ -12,13 +12,16 @@ from preferences.CriterionValue import CriterionValue
 from preferences.Item import Item
 from preferences.Value import Value
 
+from arguments.Argument import Argument
+
 from role.Role import Role
 from role.DirectoryFaciliator import DirectoryFacilitator
 
-from dialog.EnginesDialog import EnginesDialog
+from negociation.EnginesNegotiation import EnginesNegotiation
 
 from typing import List
 import random
+import numpy as np
 
 
 class ArgumentAgent(CommunicatingAgent):
@@ -29,12 +32,64 @@ class ArgumentAgent(CommunicatingAgent):
     def __init__(self, unique_id, model: 'ArgumentModel', name, engine_models: List[Item]):
         super().__init__(unique_id, model, name)
         self.preference = self.generate_preferences(engine_models, CriterionName.to_list())
-        self._dialog = EnginesDialog(engine_models)
+        self._negotiations = EnginesNegotiation(engine_models)
         self.announce_existence_to_the_world = False
         self._df = model.get_directory_facilitator()
 
     def get_preference(self):
         return self.preference
+
+    def support_proposal(self, item: 'Item') -> Argument:
+        """
+               Used when the agent recieves "ASK_WHY" after having proposed an item
+               :param item: str - name of the item which was proposed
+               :return: Argument - the strongest supportive argument
+               """
+
+        proposals = self.list_supporting_proposal(item)
+        return proposals[0]
+
+
+    def list_supporting_proposal(self, item: 'Item', criterion_to_argue: str = None) -> List[
+        'Argument']:
+        arguments = []
+
+        # Getting criterion preferences
+        order_preferences = self.preference.get_criterion_name_list()
+
+        for criterion in order_preferences:
+            criterion_value = item.get_value(self.preference, criterion)
+
+            if criterion_value == Value.GOOD or criterion_value == Value.VERY_GOOD:
+                argument = Argument(True, item)
+                argument.add_premiss_couple_values(criterion, criterion_value)
+                arguments.append(argument)
+
+        return arguments
+
+    def list_attacking_proposal(self, item: 'Item', criterion_to_argue: str = None) -> List[
+        'Argument']:
+        arguments = []
+
+        # Getting criterion preferences
+        order_preferences = self.preferences.get_criterion_name_list()
+
+        if criterion_to_argue:
+            idx_criterion_to_argue = np.where(order_preferences == criterion_to_argue)[0]
+
+        for idx, criterion in enumerate(order_preferences):
+            criterion_value = item.get_value(self.preference, criterion)
+
+            if criterion_value == Value.BAD or criterion_value == Value.VERY_BAD:
+                argument = Argument(False, item)
+                argument.add_premiss_couple_values(criterion, criterion_value)
+
+                if criterion_to_argue and idx < idx_criterion_to_argue:
+                    argument.add_premiss_comparison(criterion, criterion_to_argue)
+
+                arguments.append(argument)
+
+        return arguments
 
     def generate_preferences(self, engine_models: List[Item], criteria: List[CriterionName]) -> Preferences:
         # Creating the preference instance
@@ -64,8 +119,8 @@ class ArgumentAgent(CommunicatingAgent):
         # We iterate through the interlocutors
         for interlocutor in engines_interlocutors:
             # We check if we have already discussed with this interlocutor before
-            if self._dialog.is_not_an_interlocutor(interlocutor):
-                self._dialog.add_interlocutor(interlocutor)
+            if self._negotiations.is_not_an_interlocutor(interlocutor):
+                self._negotiations.add_interlocutor(interlocutor)
 
         # We then iterate through the messages
         new_messages = self.get_new_messages()
@@ -82,7 +137,7 @@ class ArgumentAgent(CommunicatingAgent):
                 engine = message.get_content()
 
                 # We check if the engine proposed is one of our preferred ones
-                if self.preference.is_item_among_top_10_percent(engine, self._dialog.get_engines()):
+                if self.preference.is_item_among_top_10_percent(engine, self._negotiations.get_engines()):
                     self.send_message(Message(
                         self.get_name(),
                         expeditor,
@@ -103,7 +158,7 @@ class ArgumentAgent(CommunicatingAgent):
 
                 # The agent can now delete the engine from his/her list of engines that have not been discussed with
                 # the other agent
-                self._dialog.get_dialog_with_agent(expeditor).delete_topic(engine)
+                self._negotiations.delete_negotiation_with_interlocutor(expeditor, engine)
 
             # We can now remove the interlocutor from our list of interlocutors since we have spoken with him/her
             engines_interlocutors.remove(expeditor)
@@ -115,7 +170,7 @@ class ArgumentAgent(CommunicatingAgent):
 
             if len(messages) == 0 or messages[0].get_performative() == MessagePerformative.COMMIT:
                 # We now check if we can talk about an engine that has not been discussed before
-                engine = self._dialog.get_dialog_with_agent(interlocutor).get_random_topic()
+                engine = self._negotiations.get_random_engine_for_negotiation(interlocutor)
 
                 if engine is not None:
                     self.send_message(Message(
@@ -176,4 +231,4 @@ if __name__ == "__main__":
     argument_model.add_agent(bob)
 
     # Running
-    argument_model.run_n_step(5)
+    # argument_model.run_n_step(5)

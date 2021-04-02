@@ -28,7 +28,7 @@ class Preferences:
         """
         return self.__criterion_name_list
 
-    def get_criterion_value_list(self):
+    def get_criterion_value_list(self) -> List[CriterionValue]:
         """Returns the list of criterion value.
         """
         return self.__criterion_value_list

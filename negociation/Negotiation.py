@@ -1,12 +1,10 @@
-from typing import List
-from dialog.DialogTopics import DialogTopics
+from typing import List, Dict
 
-
-class Dialog:
+class Negotiation:
     def __init__(self, description):
         # Permits to understand what the agents will be talking about
         self._description = description
-        self._dialogs = dict()
+        self._negotiations = dict()
 
     def get_dialog_description(self):
         """
@@ -18,43 +16,43 @@ class Dialog:
         """
         Add an interlocutor
         """
-        self._dialogs[interlocutor_id] = None  # Specialised classes will take care of it
+        self._negotiations[interlocutor_id] = None  # Specialised classes will take care of it
 
     def remove_interlocutor(self, interlocutor_id: str):
         """
         Delete an interlocutor we would be able to talk with.
         """
-        del self._dialogs[interlocutor_id]
+        del self._negotiations[interlocutor_id]
 
     def get_interlocutors(self) -> List:
         """
         Return a list of interlocutors
         """
-        return list(self._dialogs.keys())
+        return list(self._negotiations.keys())
 
-    def get_dialog_with_agent(self, agent_id) -> DialogTopics:
+    def get_negotiation_with_agent(self, agent_id) -> Dict:
         """
-        Return a dialog with a specific agent.
+        Return a negotiation with a specific agent.
         """
-        return self._dialogs[agent_id]
+        return self._negotiations[agent_id]
 
     def is_not_an_interlocutor(self, agent_id) -> bool:
         """
         Return a boolean to indicate whether or not the agent is already communicating with another agent
         """
         try:
-            discussion = self._dialogs[agent_id]
+            discussion = self._negotiations[agent_id]
             return False
         except KeyError:
             return True
 
 
 if __name__ == '__main__':
-    description = "A dialog about life"
-    dialog = Dialog(description)
+    description = "A negociation about life"
+    dialog = Negotiation(description)
 
     assert dialog.get_dialog_description() == description
-    print("[INFO] Method to return the description of the dialog... OK")
+    print("[INFO] Method to return the description of the negociation... OK")
 
     # Test adding an interlocutor
     interlocutor = "AgentSmith"
