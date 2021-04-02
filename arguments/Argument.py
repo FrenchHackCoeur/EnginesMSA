@@ -2,8 +2,6 @@
 from typing import TYPE_CHECKING, List, Dict
 from arguments.Comparison import Comparison
 from arguments.CoupleValue import CoupleValue
-from preferences.Item import Item
-from pw_argumentation import ArgumentModel, ArgumentAgent
 
 if TYPE_CHECKING:
     from preferences.Item import Item
@@ -33,11 +31,19 @@ class Argument:
         """
         self.__comparison_list.append(Comparison(criterion_name_1, criterion_name_2))
 
+    def get_criterion_used_name(self) -> str:
+        """
+        Returns the name of the criterion used to create our argument
+        """
+        return self.__couple_values_list[0].get_criterion_name()
+
     @staticmethod
     def argument_parsing(argument: 'Argument') -> Dict:
         return dict(
+            in_favor=argument.__decision,
             criterion_used_name=argument.__couple_values_list[0].get_criterion_name(),
             criterion_used_value=argument.__couple_values_list[0].get_value(),
+            argument_based_on_comparison=len(argument.__comparison_list) != 0
         )
 
     def add_premiss_couple_values(self, criterion_name, value):

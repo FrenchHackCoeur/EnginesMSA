@@ -65,10 +65,10 @@ class Preferences:
         """
         return item_1.get_score(self) > item_2.get_score(self)
 
-    def most_preferred(self, item_list):
-        """Returns the most preferred item from a list.
+    def most_preferred(self, item_list: List[Item]) -> Item:
         """
-        # To be completed
+        Returns the most preferred item from a list.
+        """
         scores = []
 
         # On trie les élèments pour apporter de l'aléatoire dans le max
@@ -79,7 +79,7 @@ class Preferences:
 
         return item_list[scores.index(max(scores))]
 
-    def is_item_among_top_10_percent(self, item, item_list):
+    def is_item_among_top_10_percent(self, item: Item, item_list: List[Item]) -> bool:
         """
         Return whether a given item is among the top 10 percent of the preferred items.
 

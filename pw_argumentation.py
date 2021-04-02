@@ -1,5 +1,6 @@
 from mesa import Model
 from mesa.time import RandomActivation
+from typing import List, Union
 
 from agent.CommunicatingAgent import CommunicatingAgent
 from message.MessageService import MessageService
@@ -19,7 +20,7 @@ from role.DirectoryFaciliator import DirectoryFacilitator
 
 from negociation.EnginesNegotiation import EnginesNegotiation
 
-from typing import List
+
 import random
 import numpy as np
 
@@ -39,22 +40,32 @@ class ArgumentAgent(CommunicatingAgent):
     def get_preference(self):
         return self.preference
 
-    def support_proposal(self, item: 'Item') -> Argument:
+    def support_proposal(self, item: 'Item') -> Union[Argument, None]:
         """
-               Used when the agent recieves "ASK_WHY" after having proposed an item
+               Used when the agent receives "ASK_WHY" after having proposed an item
                :param item: str - name of the item which was proposed
-               :return: Argument - the strongest supportive argument
+               :return: Argument - the strongest supportive argument or None
                """
 
         proposals = self.list_supporting_proposal(item)
+
+        if len(proposals) == 0:
+            return None
+
         return proposals[0]
 
+    def list_supporting_proposal(self, item: 'Item') -> List['Argument']:
+        """
+        Returns a list of arguments that the agent can use to defend its proposition
 
-    def list_supporting_proposal(self, item: 'Item', criterion_to_argue: str = None) -> List[
-        'Argument']:
+        params:
+         - item: The item that the agent has proposed
+        return:
+            A list of arguments
+        """
         arguments = []
 
-        # Getting criterion preferences
+        # Getting criterion that we can use
         order_preferences = self.preference.get_criterion_name_list()
 
         for criterion in order_preferences:
@@ -67,26 +78,26 @@ class ArgumentAgent(CommunicatingAgent):
 
         return arguments
 
-    def list_attacking_proposal(self, item: 'Item', criterion_to_argue: str = None) -> List[
-        'Argument']:
+    def list_attacking_proposal(self, item: 'Item') -> List['Argument']:
+        """
+            Returns a list of arguments that the agent can use to argue against a proposition
+
+            params:
+             - item: The item that the agent has proposed
+            return:
+                A list of arguments
+        """
         arguments = []
 
-        # Getting criterion preferences
-        order_preferences = self.preferences.get_criterion_name_list()
+        # Getting criterion that we can use
+        order_preferences = self.preference.get_criterion_name_list()
 
-        if criterion_to_argue:
-            idx_criterion_to_argue = np.where(order_preferences == criterion_to_argue)[0]
-
-        for idx, criterion in enumerate(order_preferences):
+        for criterion in order_preferences:
             criterion_value = item.get_value(self.preference, criterion)
 
             if criterion_value == Value.BAD or criterion_value == Value.VERY_BAD:
-                argument = Argument(False, item)
+                argument = Argument(True, item)
                 argument.add_premiss_couple_values(criterion, criterion_value)
-
-                if criterion_to_argue and idx < idx_criterion_to_argue:
-                    argument.add_premiss_comparison(criterion, criterion_to_argue)
-
                 arguments.append(argument)
 
         return arguments
@@ -138,12 +149,23 @@ class ArgumentAgent(CommunicatingAgent):
 
                 # We check if the engine proposed is one of our preferred ones
                 if self.preference.is_item_among_top_10_percent(engine, self._negotiations.get_engines()):
-                    self.send_message(Message(
-                        self.get_name(),
-                        expeditor,
-                        MessagePerformative.ACCEPT,
-                        engine
-                    ))
+                    # We then need to check if the engine is our preferred one
+                    most_preferred_engine = self.preference.most_preferred(self._negotiations.get_engines())
+
+                    if most_preferred_engine.get_name() == engine:
+                        self.send_message(Message(
+                            self.get_name(),
+                            expeditor,
+                            MessagePerformative.ACCEPT,
+                            engine
+                        ))
+                    else:
+                        self.send_message(Message(
+                            self.get_name(),
+                            expeditor,
+                            MessagePerformative.PROPOSE,
+                            most_preferred_engine
+                        ))
                 else:
                     # Otherwise the agent will ask why the other agent proposed this engine
                     self.send_message(Message(
@@ -152,11 +174,70 @@ class ArgumentAgent(CommunicatingAgent):
                         MessagePerformative.ASK_WHY,
                         engine
                     ))
-            elif performative == MessagePerformative.COMMIT:
-                # We retrieved the engine mentioned in the protocol
+            elif performative == MessagePerformative.ASK_WHY:
+                # We get the engine proposed by an agent
                 engine = message.get_content()
 
-                # The agent can now delete the engine from his/her list of engines that have not been discussed with
+                # We have to check if we can find an argument in favor of the engine proposed
+                argument_in_favor = self.support_proposal(engine)
+
+                if argument_in_favor:
+                    self.send_message(Message(
+                        self.get_name(),
+                        expeditor,
+                        MessagePerformative.ARGUE,
+                        (engine, argument_in_favor)
+                    ))
+
+                    # We have now to update the negotiation dict to keep in memory the argument we used
+                    self._negotiations.add_criterion_used_for_negotiation(
+                        expeditor,
+                        engine,
+                        argument_in_favor.get_criterion_used_name()
+                    )
+                else:
+                    # We have to remove the engine as we have not argument in favor of this engine
+                    self._negotiations.delete_negotiation_with_interlocutor(expeditor, engine)
+
+                    # We have to propose another engine if possible
+                    other_engine_proposed = self._negotiations.get_random_engine_for_negotiation(expeditor)
+
+                    if other_engine_proposed:
+                        self.send_message(Message(
+                            self.get_name(),
+                            expeditor,
+                            MessagePerformative.PROPOSE,
+                            other_engine_proposed
+                        ))
+            elif performative == MessagePerformative.ARGUE:
+                # Getting engine for which we are arguing and the arguments of our interlocutor
+                engine, arguments = message.get_content()
+
+                # Parsing arguments data
+                arguments_data = Argument.argument_parsing(arguments)
+
+                if arguments_data["in_favor"]:
+                    # We have to send an argument against the engine
+                    pass
+                else:
+                    pass
+
+            elif performative == MessagePerformative.ACCEPT:
+                # We get the engine proposed by an agent
+                engine = message.get_content()
+
+                # We send a message with commit performative
+                self.send_message(Message(
+                    self.get_name(),
+                    expeditor,
+                    MessagePerformative.COMMIT,
+                    engine
+                ))
+            elif performative == MessagePerformative.COMMIT:
+                # We get the engine proposed by an agent
+                engine = message.get_content()
+
+                # The agent can now delete the engine from his/her list of engines that have not been negotiated with
                 # the other agent
                 self._negotiations.delete_negotiation_with_interlocutor(expeditor, engine)
 
@@ -231,4 +312,4 @@ if __name__ == "__main__":
     argument_model.add_agent(bob)
 
     # Running
-    # argument_model.run_n_step(5)
+    argument_model.run_n_step(2)
