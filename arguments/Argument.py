@@ -2,6 +2,7 @@
 from typing import TYPE_CHECKING, List, Dict
 from arguments.Comparison import Comparison
 from arguments.CoupleValue import CoupleValue
+from preferences.CriterionName import CriterionName
 
 if TYPE_CHECKING:
     from preferences.Item import Item
@@ -22,7 +23,7 @@ class Argument:
         """Creates a new Argument.
         """
         self.__decision = boolean_decision
-        self.__item = item.get_name()
+        self.__item = item
         self.__comparison_list: List['Comparison'] = []
         self.__couple_values_list: List['CoupleValue'] = []
 
@@ -31,20 +32,18 @@ class Argument:
         """
         self.__comparison_list.append(Comparison(criterion_name_1, criterion_name_2))
 
-    def get_criterion_used_name(self) -> str:
+    def get_criterion_used_name(self) -> CriterionName:
         """
         Returns the name of the criterion used to create our argument
         """
         return self.__couple_values_list[0].get_criterion_name()
 
     @staticmethod
-    def argument_parsing(argument: 'Argument') -> Dict:
-        return dict(
-            in_favor=argument.__decision,
-            criterion_used_name=argument.__couple_values_list[0].get_criterion_name(),
-            criterion_used_value=argument.__couple_values_list[0].get_value(),
-            argument_based_on_comparison=len(argument.__comparison_list) != 0
-        )
+    def argument_parsing(argument: 'Argument') -> List:
+        return [
+            (argument.__decision, argument.__item),
+            [*argument.__couple_values_list, *argument.__comparison_list]
+        ]
 
     def add_premiss_couple_values(self, criterion_name, value):
         """Add a premiss couple values in the couple values list.

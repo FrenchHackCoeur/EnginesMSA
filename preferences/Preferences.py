@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from typing import List
+from typing import List, Union
 from preferences.CriterionName import CriterionName
 from preferences.CriterionValue import CriterionValue
 from preferences.Item import Item
@@ -20,8 +20,8 @@ class Preferences:
     def __init__(self):
         """Creates a new Preferences object.
         """
-        self.__criterion_name_list = []
-        self.__criterion_value_list = []
+        self.__criterion_name_list: List['CriterionName'] = []
+        self.__criterion_value_list: List['CriterionValue'] = []
 
     def get_criterion_name_list(self):
         """Returns the list of criterion name.
@@ -59,6 +59,38 @@ class Preferences:
                 return True
             if criterion_name == criterion_name_2:
                 return False
+
+    def get_criterion_value_for_item(self, item: Item) -> dict:
+        result = dict()
+
+        for elmt in self.__criterion_value_list:
+            if elmt.get_item().get_name() == item.get_name():
+                result[elmt.get_criterion_name()] = elmt.get_value()
+
+        return result
+
+    def get_better_criterion(self, criterion: CriterionName) -> Union[CriterionName, None]:
+        """
+        Trying to get a criterion that is higher in our table of preferences.
+
+        Params:
+            - criterion: our base criterion to look for better criteria
+
+        Return
+            A criterion that is ranked higher in the table of preferences of the agent
+        """
+        possibilities = []
+
+        for preference in self.__criterion_name_list:
+            if preference == criterion:
+                break
+
+            possibilities.append(preference)
+
+        if len(possibilities) == 0:
+            return None
+
+        return random.choice(possibilities)
 
     def is_preferred_item(self, item_1, item_2):
         """Returns if the item 1 is preferred to the item 2.
@@ -159,5 +191,5 @@ if __name__ == '__main__':
     print('Most preferred item is : {}'.format(
         agent_pref.most_preferred([diesel_engine, electric_engine, hydrogen_engine]).get_name()))
     print('Is Electric Engine in top 10% preferences : {}'.
-          format(
+        format(
         agent_pref.is_item_among_top_10_percent(hydrogen_engine, [diesel_engine, electric_engine, hydrogen_engine])))

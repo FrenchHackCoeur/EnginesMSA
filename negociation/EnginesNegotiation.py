@@ -1,7 +1,7 @@
 from typing import List, Union
 from negociation.Negotiation import Negotiation
 from preferences.Item import Item
-from preferences.CriterionName import CriterionName
+from arguments.Argument import Argument
 import random
 
 
@@ -29,123 +29,89 @@ class EnginesNegotiation(Negotiation):
         """
         super().add_interlocutor(interlocutor_id)
 
-        negotiations = dict()
-
-        for engine in self._engines:
-            negotiations[engine] = []
-
-        self._negotiations[interlocutor_id] = negotiations
-
-    def add_criterion_used_for_negotiation(self, interlocutor_id: str, engine: 'Item', criterion: str):
+    def add_negotiation_topic(self, interlocutor_id: str, topic: 'Item'):
         """
-        Append an argument used to negotiate about an engine
+        Add an engine to be negotiated between the agent and interlocutor_id
 
-        params:
-            - interlocutor_id: The id of our interlocutor
-            - engine: A reference to the engine that is currently being negotiated with a specific interlocutor
-
+        Params:
+            - interlocutor_id the id of interlocutor to negotiate with
         """
-        self._negotiations[interlocutor_id][engine].append(criterion)
+        self._negotiations[interlocutor_id][topic] = []
 
-    def get_criterion_used_for_negatiation(self, interlocutor_id: str, engine: 'Item') -> List[str]:
+    def add_argument(self, interlocutor_id: str, topic: 'Item', argument: 'Argument'):
         """
-        Return all the criterion used for a negotiation concerning a specific engine
+        Add an argument for a negotiation about a specific engine with interlocutor_id
 
-        params:
-            - interlocutor_id: The id of our interlocutor
-            - engine: A reference to the engine that is currently being negotiated with a specific interlocutor
-
-        return:
-            A list of criterion that have been used for negotiation
+        Params:
+         - interlocutor_id: the id of the interlocutor with which the agent is currently negotiating about a specific
+         engine.
+         - topic: The engine currently being negotiating
+         - argument: The argument used by the agent
         """
-        return self._negotiations[interlocutor_id][engine]
+        self._negotiations[interlocutor_id][topic].append(argument)
 
-    def delete_negotiation_with_interlocutor(self, interlocutor_id: str, engine: 'Item'):
+    def get_random_negotiation_topic(self, interlocutor_id: str) -> Union[None, 'Item']:
         """
-        Delete a negotiation about an engine with a specific interlocutor
+        Return an engine that has not been negotiated with interlocutor_id yet. It may possible that the function
+        returns a None object if the agents have negotiated all the engines mentioned in engines_.
 
-        params:
-        - interlocutor_id: The id of our interlocutor
-        - engine: A reference to the engine that is currently being negotiated with a specific interlocutor
+        Params:
+            - interlocutor_id the id of interlocutor to negotiate with
+        Return:
+            An engine to negotiate if it's possible to do so
         """
-        del self._negotiations[interlocutor_id][engine]
+        topics_negotiated = set(self._negotiations[interlocutor_id].keys())
+        available_topics = set(self._engines).difference(topics_negotiated)
 
-    def get_random_engine_for_negotiation(self, interlocutor_id: str) -> Union['Item', None]:
-        """
-        Return a random negotiation to start with an agent
-
-        params:
-            - interlocutor_id: The id of our interlocutor
-
-        return:
-            An engine with which an agent can start a negotiation with another agent if they have still engines to
-            talk about.
-        """
-        possible_neg = list(self._negotiations[interlocutor_id])
-
-        if len(possible_neg) == 0:
+        if len(available_topics) == 0:
             return None
 
-        return random.choice(possible_neg)
+        selected_topic = random.choice(list(available_topics))
+
+        # Adding the engine to the list of items that have been negotiated with interlocutor_id
+        self.add_negotiation_topic(interlocutor_id, selected_topic)
+
+        return selected_topic
 
 
 if __name__ == '__main__':
     # Creating a list of engines
     engines = [
         Item("Electric Engine", "An engine that works with electricity"),
-        Item("Diesel Engine", "An engine that works with fuel"),
-        Item("Hydrogen Engine", "An engine that works with hydrogen")
     ]
 
     # Creating Negotiation instance
     negotiations = EnginesNegotiation(engines)
 
-    # Verifying that the _engines property is set
+    # Testing returning engines
     engines_ = negotiations.get_engines()
-    assert engines_ is not None
-    assert len(engines_) == 3
-    print("[INFO] engines_ property set correctly... ok")
 
-    # Creating an interlocutor named Alice
-    alice_id = "alice"
+    assert len(engines_) == len(engines)
+    print("[INFO] Getting engines... OK !")
 
-    negotiations.add_interlocutor(alice_id)
+    # Testing adding interlocutor
+    agent_id = "Alice"
+    negotiations.add_interlocutor(agent_id)
+    negotiations_ = negotiations._negotiations
 
-    # Checking that negotiations is not empty
-    neg_keys = list(negotiations._negotiations.keys())
-    assert len(neg_keys) == 1
-    assert neg_keys[0] == alice_id
-    print("[INFO] adding new interlocutor... ok")
+    assert len(negotiations_[agent_id]) == 0
+    print("[INFO] Adding new interlocutor... OK !")
 
-    # Checking that we can discuss with alice about three different engines
-    engines_with_alice = list(negotiations._negotiations[alice_id].keys())
-    assert len(engines_with_alice) == len(engines)
-    print("[INFO] Engines has been added successfully in dict... ok")
+    # Testing adding a new negotiation topic
+    topic = negotiations.get_random_negotiation_topic(agent_id)
 
-    # Checking to pick a random engine
-    random_engine = negotiations.get_random_engine_for_negotiation(alice_id)
+    assert topic is not None
+    assert type(topic) is Item
+    print("[INFO] Getting random topic to negotiate with alice ... OK !")
 
-    assert random_engine is not None
-    print("[INFO] getting a random engine to negotiate with alice... ok")
+    topic = negotiations.get_random_negotiation_topic(agent_id)
 
-    # Check adding a criteria used for negotiation
-    negotiations.add_criterion_used_for_negotiation(alice_id, random_engine, CriterionName.CONSUMPTION.value)
+    assert topic is None
+    print("[INFO] Getting none value as all the engines have been negotiated with alice... OK!")
 
-    assert len(negotiations._negotiations[alice_id][random_engine]) == 1
-    print("[INFO] Adding a criteria used for a negotiation with Alice... ok")
+    # Testing adding an argument
+    negotiations.add_argument(agent_id, engines[0], Argument(True, engines[0]))
+    negotiations_ = negotiations._negotiations[agent_id]
 
-    # Check retrieving the criteria used for negotiation with Alice
-    criterion = negotiations.get_criterion_used_for_negatiation(alice_id, random_engine)
-    assert len(criterion) == 1
-    assert criterion[0] == CriterionName.CONSUMPTION.value
-    print("[INFO] Retrieving criteria used for a negotiation with Alice... ok")
-
-    # Checking deletion of an engine that has been negotiated with Alice
-    engine_ = engines[0]
-    negotiations.delete_negotiation_with_interlocutor(alice_id, engine_)
-    neg_engines_alice = list(negotiations._negotiations[alice_id].keys())
-    assert len(neg_engines_alice) == len(engines) - 1
-    assert engine_ is not None
-    print("[INFO] Deletion of an engine that has been discussed... ok")
-    print(engine_)
-
+    assert len(negotiations_) == 1
+    print("[INFO] Adding an argument concerning a specific negotiation... OK!")

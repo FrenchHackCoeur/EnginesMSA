@@ -16,7 +16,7 @@ class Negotiation:
         """
         Add an interlocutor
         """
-        self._negotiations[interlocutor_id] = None  # Specialised classes will take care of it
+        self._negotiations[interlocutor_id] = dict()  # Specialised classes will take care of it
 
     def remove_interlocutor(self, interlocutor_id: str):
         """
