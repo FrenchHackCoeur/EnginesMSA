@@ -1,82 +1,71 @@
-from typing import List, Dict
+from typing import List
+from preferences.Item import Item
+from arguments.Argument import Argument
+
 
 class Negotiation:
-    def __init__(self, description):
-        # Permits to understand what the agents will be talking about
-        self._description = description
-        self._negotiations = dict()
+    def __init__(self, agents: List[str]):
+        self._negotiations = self.initialize(agents)
 
-    def get_dialog_description(self):
-        """
-        Return a description of the discussion
-        """
-        return self._description
+    def initialize(self, agents: List[str]) -> dict:
+        result = dict()
+        agents_size = len(agents)
+        for i in range(agents_size):
+            for j in range(i + 1, agents_size):
+                result[(agents[i], agents[j])] = {
+                    "initiator": None,
+                    "arguments": []
+                }
 
-    def add_interlocutor(self, interlocutor_id: str):
-        """
-        Add an interlocutor
-        """
-        self._negotiations[interlocutor_id] = dict()  # Specialised classes will take care of it
+        return result
 
-    def remove_interlocutor(self, interlocutor_id: str):
-        """
-        Delete an interlocutor we would be able to talk with.
-        """
-        del self._negotiations[interlocutor_id]
+    def get_tuple(self, initiator: str, interlocutor: str):
+        return (initiator, interlocutor) if initiator < interlocutor else (interlocutor, initiator)
 
-    def get_interlocutors(self) -> List:
-        """
-        Return a list of interlocutors
-        """
-        return list(self._negotiations.keys())
+    def start_negotiation(self, initiator: str, interlocutor: str):
+        tuple_ = self.get_tuple(initiator, interlocutor)
+        self._negotiations[tuple_]["initiator"] = initiator
 
-    def get_negotiation_with_agent(self, agent_id) -> Dict:
-        """
-        Return a negotiation with a specific agent.
-        """
-        return self._negotiations[agent_id]
+    def append_argument(self, initiator: str, interlocutor: str, argument: Argument):
+        tuple_ = self.get_tuple(initiator, interlocutor)
+        self._negotiations[tuple_]["arguments"].append(argument)
 
-    def is_not_an_interlocutor(self, agent_id) -> bool:
-        """
-        Return a boolean to indicate whether or not the agent is already communicating with another agent
-        """
-        try:
-            discussion = self._negotiations[agent_id]
-            return False
-        except KeyError:
+    def has_started_negotiation(self, initiator: str, interlocutor: str) -> bool:
+        tuple_ = self.get_tuple(initiator, interlocutor)
+        if self._negotiations[tuple_]["initiator"] is not None:
             return True
 
+        return False
 
 if __name__ == '__main__':
-    description = "A negociation about life"
-    dialog = Negotiation(description)
+    agents = ["Alice", "Bob", "Hugo"]
+    item = Item("Electric Engine", "An engine that works with electricity")
+    negotiations = Negotiation(agents)
 
-    assert dialog.get_dialog_description() == description
-    print("[INFO] Method to return the description of the negociation... OK")
+    # Testing structure of the dictionary
+    dict_ = negotiations._negotiations
+    assert len(list(dict_.keys())) == len(agents)
+    try:
+        obj_ = dict_[(agents[0], agents[1])]
+    except Exception as err:
+        print(err)
+    print("[INFO] Structure of the dictionary is correct ... OK!")
 
-    # Test adding an interlocutor
-    interlocutor = "AgentSmith"
+    # Trying to start a negotiation
+    negotiations.start_negotiation(agents[1], agents[0])
 
-    dialog.add_interlocutor(interlocutor)
+    assert dict_[(agents[0], agents[1])]["initiator"] == agents[1]
+    print("[INFO] Starting a negotiation with Alice... OK!")
 
-    interlocutors = dialog.get_interlocutors()
-    assert len(interlocutors) == 1
-    assert interlocutors[0] == interlocutor
-    print("[INFO] Method to add an interlocutor and to return interlocutors... OK")
+    # Trying to add an argument
+    negotiations.append_argument(agents[0], agents[1], Argument(False, item))
 
-    # Test to remove an interlocutor
-    dialog.remove_interlocutor(interlocutor)
-    interlocutors = dialog.get_interlocutors()
+    assert len(dict_[(agents[0], agents[1])]["arguments"])
+    print("[INFO] Adding an argument to the list... OK!")
 
-    assert len(interlocutors) == 0
-    print("[INFO] Method to delete an interlocutor... OK")
-
-    # Testing the function that indicates if we are already discussing with a specific agent
-    dialog.add_interlocutor(interlocutor)
-    answer_1 = dialog.is_not_an_interlocutor(interlocutor)
-    answer_2 = dialog.is_not_an_interlocutor("AgentPamela")
-
-    assert answer_1 is False
-    assert answer_2 is True
-
-    print("[INFO] Testing the method that indicates whether or not we are already discussing with an agent... OK")
+    # Testing function to determine if a negotiation has started with a specific interlocutor
+    res = negotiations.has_started_negotiation(agents[0], agents[2])
+    res_2 = negotiations.has_started_negotiation(agents[0], agents[1])
+    assert res is False
+    assert res_2 is True
+    print("[INFO] Function has_started_negotiation works correctly... OK!")

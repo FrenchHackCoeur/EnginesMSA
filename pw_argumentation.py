@@ -16,10 +16,10 @@ from preferences.Value import Value
 from arguments.Argument import Argument
 from arguments.CoupleValue import CoupleValue
 
+from negociation.Negotiation import Negotiation
+
 from role.Role import Role
 from role.DirectoryFaciliator import DirectoryFacilitator
-
-from negociation.EnginesNegotiation import EnginesNegotiation
 
 import random
 
@@ -31,10 +31,11 @@ class ArgumentAgent(CommunicatingAgent):
 
     def __init__(self, unique_id, model: 'ArgumentModel', name, engine_models: List[Item]):
         super().__init__(unique_id, model, name)
+        self._engines = engine_models
         self.preference = self.generate_preferences(engine_models, CriterionName.to_list())
-        self._negotiations = EnginesNegotiation(engine_models)
         self.announce_existence_to_the_world = False
         self._df = model.get_directory_facilitator()
+        self._negotiations = model.get_negotiations()
 
     def get_preference(self):
         return self.preference
@@ -60,88 +61,11 @@ class ArgumentAgent(CommunicatingAgent):
 
         return preference
 
-    def list_supporting_proposal(self, item) -> List[Tuple]:
-        """
-        Generate a list of premisses which can be used to support an item
-        :param item: Item - name of the item
-        :return: list of all premisses PRO an item (sorted by order of importance based on agent's preferences)
-        """
-        result = []
-        feelings_about_engine = self.preference.get_criterion_value_for_item(item)
-        preferences = self.preference.get_criterion_name_list()
 
-        for preference in preferences:
-            criterion_value = feelings_about_engine[preference]
-
-            if criterion_value == Value.VERY_GOOD or criterion_value == Value.GOOD:
-                result.append((preference, criterion_value))
-
-        return result
-
-    def list_attacking_proposal(self, item) -> List[Tuple]:
-        """
-        Generate a list of premisses which can be used to attack an item
-        :param item: Item - name of the item
-        :return: list of all premisses CON an item (sorted by order of importance based on preferences)
-        """
-        result = []
-        feelings_about_engine = self.preference.get_criterion_value_for_item(item)
-        preferences = self.preference.get_criterion_name_list()
-
-        for preference in preferences:
-            criterion_value = feelings_about_engine[preference]
-
-            if criterion_value == Value.VERY_BAD or criterion_value == Value.BAD:
-                result.append((preference, criterion_value))
-
-        return result
-
-    def try_get_counter_argument(self, argument: Argument) -> Union[Argument, None]:
-        conclusion, premisses = Argument.argument_parsing(argument)
-        arguments = []
-        if conclusion[0]:
-            if len(premisses) == 1:
-                # Checking if the premiss is a CoupleValue
-                if type(premisses[0]) == CoupleValue:
-                    premiss: CoupleValue = premisses[0]
-                    criterion = premiss.get_criterion_name()
-
-                    # Trying to find a better criterion
-                    better_criterion = self.preference.get_better_criterion(criterion)
-                    if not better_criterion:
-                        argument = Argument(False, conclusion[1])
-                        argument.add_premiss_comparison(better_criterion, criterion)
-                        arguments.append(argument)
-
-                    # Trying to find a better product
-
-            # Selecting a random coutner argument
-            return random.choice(arguments)
-        else:
-            pass
-        
-        if len(arguments) == 0:
-            return None
-
-        return random.choice(arguments)
-
-    def support_proposal(self, item) -> Tuple:
-        """
-        Used when the agent recieves "ASK_WHY" after having proposed an item
-        :param item: str - name of the item which was proposed
-        :return: string - the strongest supportive argument
-        """
-        return self.list_supporting_proposal(item)[0]
 
     def step(self):
         # Get a list of interlocutors with which the agent can talk about engines
         engines_interlocutors = self._df.get_agents_with_specific_role(self.get_name(), Role.EnginesTalker)
-
-        # We iterate through the interlocutors
-        for interlocutor in engines_interlocutors:
-            # We check if we have already discussed with this interlocutor before
-            if self._negotiations.is_not_an_interlocutor(interlocutor):
-                self._negotiations.add_interlocutor(interlocutor)
 
         # We then iterate through the messages
         new_messages = self.get_new_messages()
@@ -184,84 +108,37 @@ class ArgumentAgent(CommunicatingAgent):
                         MessagePerformative.ASK_WHY,
                         engine
                     ))
-            elif performative == MessagePerformative.ARGUE:
-                # Getting the argument used by the other agent.
-                argument: Argument = message.get_content()
+            
 
-                # Getting engine
-                engine: Item = Argument.argument_parsing(argument)[0][1]
-
-                # Keeping the argument in memory for later use
-                self._negotiations.add_argument(expeditor, engine, argument)
-
-                # Trying to get a counter argument
-                counter_argument = self.try_get_counter_argument(argument)
-
-                # Keeping argument for later use
-                self._negotiations.add_argument(expeditor, engine, counter_argument)
-
-                # Sending counter argument
-                self.send_message(Message(
-                    self.get_name(),
-                    expeditor,
-                    MessagePerformative.ARGUE,
-                    counter_argument
-                ))
-            elif performative == MessagePerformative.ASK_WHY:
-                # We get the engine proposed by an agent
-                engine = message.get_content()
-
-                # We send a message with commit performative
-                argument = Argument(True, engine)
-                argument.add_premiss_couple_values(*self.support_proposal(engine))
-
-                # Keeping argument in memory
-                self._negotiations.add_argument(expeditor, engine, argument)
-
-                self.send_message(Message(
-                    self.get_name(),
-                    expeditor,
-                    MessagePerformative.ARGUE,
-                    argument
-                ))
-            elif performative == MessagePerformative.ACCEPT:
-                # We get the engine proposed by an agent
-                engine = message.get_content()
-
-                # We send a message with commit performative
-                self.send_message(Message(
-                    self.get_name(),
-                    expeditor,
-                    MessagePerformative.COMMIT,
-                    engine
-                ))
-            elif performative == MessagePerformative.COMMIT:
-                # We get the engine proposed by an agent
-                engine = message.get_content()
-
-                # The agent can now delete the engine from his/her list of engines that have not been negotiated with
-                # the other agent
-                # self._negotiations.delete_negotiation_with_interlocutor(expeditor, engine) TODO GERER CE POINT
-
-            # We can now remove the interlocutor from our list of interlocutors since we have spoken with him/her
-            engines_interlocutors.remove(expeditor)
-
-        # We now iterate through the list of interlocutors we have not received a message
+        # We now iterate through the list of interlocutors for which we have not received a message
         for interlocutor in engines_interlocutors:
-            # We check if we should send a PROPOSE message by checking the latest message receive from this agent
-            messages = self.get_messages_from_exp(interlocutor)
+            # We check if a _negotiation has already started between the two agents
+            if not self._negotiations.has_started_negotiation(self.get_name(), interlocutor):
+                # If it's not the case, we initiate a negotiation between the two agents
+                self._negotiations.start_negotiation(self.get_name(), interlocutor)
 
-            if len(messages) == 0 or messages[0].get_performative() == MessagePerformative.COMMIT:
-                # We now check if we can talk about an engine that has not been discussed before
-                engine = self._negotiations.get_random_negotiation_topic(interlocutor)
+                # The current agent will propose his/her best engine based on his/her preferences
+                self.send_message(Message(
+                    self.get_name(),
+                    interlocutor,
+                    MessagePerformative.PROPOSE,
+                    self.preference.most_preferred(self._engines)
+                ))
 
-                if engine is not None:
-                    self.send_message(Message(
-                        self.get_name(),
-                        interlocutor,
-                        MessagePerformative.PROPOSE,
-                        engine
-                    ))
+            # # We check if we should send a PROPOSE message by checking the latest message receive from this agent
+            # messages = self.get_messages_from_exp(interlocutor)
+            #
+            # if len(messages) == 0 or messages[0].get_performative() == MessagePerformative.COMMIT:
+            #     # We now check if we can talk about an engine that has not been discussed before
+            #     engine = self._negotiations.get_random_negotiation_topic(interlocutor)
+            #
+            #     if engine is not None:
+            #         self.send_message(Message(
+            #             self.get_name(),
+            #             interlocutor,
+            #             MessagePerformative.PROPOSE,
+            #             engine
+            #         ))
 
 
 class ArgumentModel(Model):
@@ -269,20 +146,25 @@ class ArgumentModel(Model):
     ArgumentModel which inherit from Model.
     """
 
-    def __init__(self):
+    def __init__(self, agents_name: List[str]):
         super().__init__()
+        self._negotiations = Negotiation(agents_name)
         self.schedule = RandomActivation(self)
         self.__messages_service = MessageService(self.schedule)
         self._df = DirectoryFacilitator()
         self._df.add_role(Role.EnginesTalker)
         self.running = True
 
+        for index, agent_name in enumerate(agents_name):
+            agent = ArgumentAgent(index, self, agent_name, engines)
+            self.schedule.add(agent)
+            self._df.attach_a_role_to_agent(Role.EnginesTalker, agent.get_name())
+
     def get_directory_facilitator(self):
         return self._df
 
-    def add_agent(self, agent: ArgumentAgent):
-        self.schedule.add(agent)
-        self._df.attach_a_role_to_agent(Role.EnginesTalker, agent.get_name())
+    def get_negotiations(self):
+        return self._negotiations
 
     def step(self):
         self.__messages_service.dispatch_messages()
@@ -302,16 +184,14 @@ if __name__ == "__main__":
         Item("Hydrogen Engine", "An engine that works with hydrogen")
     ]
 
-    # Creating our model
-    argument_model = ArgumentModel()
-
     # Creating our agents
-    alice = ArgumentAgent(1, argument_model, "Alice", engines)
-    bob = ArgumentAgent(2, argument_model, "Bob", engines)
+    agents_name = [
+        "Alice",
+        "Bob"
+    ]
 
-    # Adding our agents to our model
-    argument_model.add_agent(alice)
-    argument_model.add_agent(bob)
+    # Creating our model
+    argument_model = ArgumentModel(agents_name)
 
     # Running
-    argument_model.run_n_step(6)
+    argument_model.run_n_step(2)
