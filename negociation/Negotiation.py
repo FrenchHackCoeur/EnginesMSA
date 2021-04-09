@@ -14,13 +14,15 @@ class Negotiation:
             for j in range(i + 1, agents_size):
                 result[(agents[i], agents[j])] = {
                     "initiator": None,
-                    "arguments": []
+                    "arguments": [],
+                    "accepted_engine": None,
+                    "close_agreements": []
                 }
 
         return result
 
-    def get_tuple(self, initiator: str, interlocutor: str):
-        return (initiator, interlocutor) if initiator < interlocutor else (interlocutor, initiator)
+    def get_tuple(self, agent_1: str, agent_2: str):
+        return (agent_1, agent_2) if agent_1 < agent_2 else (agent_2, agent_1)
 
     def start_negotiation(self, initiator: str, interlocutor: str):
         tuple_ = self.get_tuple(initiator, interlocutor)
@@ -36,6 +38,18 @@ class Negotiation:
             return True
 
         return False
+
+    def set_accepted_engine(self, agent_1: str, agent_2, engine: Item):
+        tuple_ = self.get_tuple(agent_1, agent_2)
+        self._negotiations[tuple_]["accepted_engine"] = engine
+
+    def accept_ending_negotiation(self, agent_1: str, agent_2: str):
+        tuple_ = self.get_tuple(agent_1, agent_2)
+        self._negotiations[tuple_]["close_agreements"].append(agent_1)
+
+    def is_negotiation_ended(self, agent_1: str, agent_2: str):
+        tuple_ = self.get_tuple(agent_1, agent_2)
+        return len(self._negotiations[tuple_]["close_agreements"]) == 2
 
 if __name__ == '__main__':
     agents = ["Alice", "Bob", "Hugo"]
@@ -69,3 +83,10 @@ if __name__ == '__main__':
     assert res is False
     assert res_2 is True
     print("[INFO] Function has_started_negotiation works correctly... OK!")
+
+    # Testing ending a negotiation
+    negotiations.accept_ending_negotiation(agents[0], agents[1])
+    negotiations.accept_ending_negotiation(agents[1], agents[0])
+
+    assert negotiations.is_negotiation_ended(agents[0], agents[1]) is True
+    print("[INFO] Negotion has ended successfully... OK!")

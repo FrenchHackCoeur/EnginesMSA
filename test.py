@@ -114,24 +114,3 @@ self.send_message(Message(
     MessagePerformative.ARGUE,
     argument
 ))
-elif performative == MessagePerformative.ACCEPT:
-# We get the engine proposed by an agent
-engine = message.get_content()
-
-# We send a message with commit performative
-self.send_message(Message(
-    self.get_name(),
-    expeditor,
-    MessagePerformative.COMMIT,
-    engine
-))
-elif performative == MessagePerformative.COMMIT:
-# We get the engine proposed by an agent
-engine = message.get_content()
-
-# The agent can now delete the engine from his/her list of engines that have not been negotiated with
-# the other agent
-# self._negotiations.delete_negotiation_with_interlocutor(expeditor, engine) TODO GERER CE POINT
-
-# We can now remove the interlocutor from our list of interlocutors since we have spoken with him/her
-engines_interlocutors.remove(expeditor)

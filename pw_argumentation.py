@@ -82,9 +82,9 @@ class ArgumentAgent(CommunicatingAgent):
                 engine = message.get_content()
 
                 # We check if the engine proposed is one of our preferred ones
-                if self.preference.is_item_among_top_10_percent(engine, self._negotiations.get_engines()):
+                if self.preference.is_item_among_top_10_percent(engine, self._engines):
                     # We then need to check if the engine is our preferred one
-                    most_preferred_engine = self.preference.most_preferred(self._negotiations.get_engines())
+                    most_preferred_engine = self.preference.most_preferred(self._engines)
 
                     if most_preferred_engine.get_name() == engine.get_name():
                         self.send_message(Message(
@@ -108,7 +108,35 @@ class ArgumentAgent(CommunicatingAgent):
                         MessagePerformative.ASK_WHY,
                         engine
                     ))
-            
+            elif performative == MessagePerformative.ACCEPT:
+                # We get the engine proposed by an agent
+                engine = message.get_content()
+
+                # We save in memory the engine that has been accepted by the two agents
+                self._negotiations.set_accepted_engine(self.get_name(), expeditor, engine)
+
+                # We send a message with commit performative
+                self.send_message(Message(
+                    self.get_name(),
+                    expeditor,
+                    MessagePerformative.COMMIT,
+                    engine
+                ))
+            elif performative == MessagePerformative.COMMIT:
+                # We get the engine that we are talking about
+                engine = message.get_content()
+
+                # The agent indicates that he/she is ok to end the negotiation
+                self._negotiations.accept_ending_negotiation(self.get_name(), expeditor)
+
+                # We have to check if the other agent has agreed to end the negotiation too
+                if not self._negotiations.is_negotiation_ended(self.get_name(), expeditor):
+                    self.send_message(Message(
+                        self.get_name(),
+                        expeditor,
+                        MessagePerformative.COMMIT,
+                        engine
+                    ))
 
         # We now iterate through the list of interlocutors for which we have not received a message
         for interlocutor in engines_interlocutors:
@@ -124,22 +152,6 @@ class ArgumentAgent(CommunicatingAgent):
                     MessagePerformative.PROPOSE,
                     self.preference.most_preferred(self._engines)
                 ))
-
-            # # We check if we should send a PROPOSE message by checking the latest message receive from this agent
-            # messages = self.get_messages_from_exp(interlocutor)
-            #
-            # if len(messages) == 0 or messages[0].get_performative() == MessagePerformative.COMMIT:
-            #     # We now check if we can talk about an engine that has not been discussed before
-            #     engine = self._negotiations.get_random_negotiation_topic(interlocutor)
-            #
-            #     if engine is not None:
-            #         self.send_message(Message(
-            #             self.get_name(),
-            #             interlocutor,
-            #             MessagePerformative.PROPOSE,
-            #             engine
-            #         ))
-
 
 class ArgumentModel(Model):
     """
@@ -180,8 +192,9 @@ if __name__ == "__main__":
     # Creating a list that will contain the different engines used
     engines = [
         Item("Electric Engine", "An engine that works with electricity"),
-        Item("Diesel Engine", "An engine that works with fuel"),
-        Item("Hydrogen Engine", "An engine that works with hydrogen")
+        # Item("Diesel Engine", "An engine that works with fuel"),
+        # Item("Hydrogen Engine", "An engine that works with hydrogen"),
+        # Item("Nuclear Engine", "To be used with caution")
     ]
 
     # Creating our agents
@@ -194,4 +207,4 @@ if __name__ == "__main__":
     argument_model = ArgumentModel(agents_name)
 
     # Running
-    argument_model.run_n_step(2)
+    argument_model.run_n_step(8)
