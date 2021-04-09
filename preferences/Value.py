@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from enum import Enum
-
+from functools import total_ordering
 
 class Value(Enum):
     """Value enum class.
@@ -15,3 +15,7 @@ class Value(Enum):
     @classmethod
     def to_list(cls):
         return list(map(lambda c: c, cls))
+
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value < other.value

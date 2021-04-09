@@ -69,29 +69,6 @@ class Preferences:
 
         return result
 
-    def get_better_criterion(self, criterion: CriterionName) -> Union[CriterionName, None]:
-        """
-        Trying to get a criterion that is higher in our table of preferences.
-
-        Params:
-            - criterion: our base criterion to look for better criteria
-
-        Return
-            A criterion that is ranked higher in the table of preferences of the agent
-        """
-        possibilities = []
-
-        for preference in self.__criterion_name_list:
-            if preference == criterion:
-                break
-
-            possibilities.append(preference)
-
-        if len(possibilities) == 0:
-            return None
-
-        return random.choice(possibilities)
-
     def is_preferred_item(self, item_1, item_2):
         """Returns if the item 1 is preferred to the item 2.
         """

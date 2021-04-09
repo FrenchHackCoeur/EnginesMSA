@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-from typing import TYPE_CHECKING, List, Dict
+from typing import List, Union
 from arguments.Comparison import Comparison
 from arguments.CoupleValue import CoupleValue
 from preferences.CriterionName import CriterionName
+from preferences.Value import Value
 
-if TYPE_CHECKING:
-    from preferences.Item import Item
 
 
 class Argument:
@@ -27,10 +26,13 @@ class Argument:
         self.__comparison_list: List['Comparison'] = []
         self.__couple_values_list: List['CoupleValue'] = []
 
-    def add_premiss_comparison(self, criterion_name_1, criterion_name_2):
+    def add_premiss_comparison(self, val_1: Union[CriterionName, Value], val_2: Union[CriterionName, Value]):
         """Adds a premiss comparison in the comparison list.
         """
-        self.__comparison_list.append(Comparison(criterion_name_1, criterion_name_2))
+        if type(val_1) != type(val_2):
+            raise Exception("Types mismatch")
+
+        self.__comparison_list.append(Comparison(val_1, val_2))
 
     def get_criterion_used_name(self) -> CriterionName:
         """
@@ -56,12 +58,12 @@ class Argument:
         string = f"ARGUE({not_in_favor} {self.__item} <= "
 
         for item in self.__couple_values_list:
-            string += f"{item.__str__()},"
+            string += f"{item.__str__()}, "
 
         for item in self.__comparison_list:
             string += f"{item.__str__()}"
 
-        string = string.rstrip(',')
+        string = string.rstrip(', ')
         string += ")"
 
         return string

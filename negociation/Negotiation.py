@@ -2,6 +2,12 @@ from typing import List
 from preferences.Item import Item
 from arguments.Argument import Argument
 
+from arguments.CoupleValue import CoupleValue
+from arguments.Comparison import Comparison
+
+from preferences.CriterionName import CriterionName
+from preferences.Value import Value
+
 
 class Negotiation:
     def __init__(self, agents: List[str]):
@@ -51,6 +57,45 @@ class Negotiation:
         tuple_ = self.get_tuple(agent_1, agent_2)
         return len(self._negotiations[tuple_]["close_agreements"]) == 2
 
+    def is_argument_already_used(self, agent_1: str, agent_2: str, argument: Argument) -> bool:
+        tuple_ = self.get_tuple(agent_1, agent_2)
+        _, premisses = Argument.argument_parsing(argument)
+        arguments = self._negotiations[tuple_]["arguments"]
+
+        for index in range(len(arguments)):
+            argument: Argument = arguments[index]
+            _, premisses_bis = Argument.argument_parsing(argument)
+
+            if len(premisses) != len(premisses_bis):
+                continue
+
+            if len(premisses) == 1:
+                couple_value: CoupleValue = premisses[0]
+                couple_value_bis: CoupleValue = premisses_bis[0]
+
+                if couple_value.get_criterion_name() == couple_value_bis.get_criterion_name():
+                    return True
+            else:
+                couple_value: CoupleValue = premisses[0]
+                couple_value_bis: CoupleValue = premisses_bis[0]
+
+                comparison: Comparison = premisses[1]
+                comparison_bis: Comparison = premisses_bis[1]
+
+                if couple_value.get_criterion_name() != couple_value.get_criterion_name():
+                    continue
+
+                if comparison.get_best_criterion_name() != comparison_bis.get_best_criterion_name():
+                    continue
+
+                if comparison.get_worst_criterion_name() != comparison_bis.get_worst_criterion_name():
+                    continue
+
+                return True
+
+        return False
+
+
 if __name__ == '__main__':
     agents = ["Alice", "Bob", "Hugo"]
     item = Item("Electric Engine", "An engine that works with electricity")
@@ -72,7 +117,15 @@ if __name__ == '__main__':
     print("[INFO] Starting a negotiation with Alice... OK!")
 
     # Trying to add an argument
-    negotiations.add_argument(agents[0], agents[1], Argument(False, item))
+    argument_1 = Argument(False, item)
+    argument_1.add_premiss_couple_values(CriterionName.ENVIRONMENT_IMPACT, Value.VERY_BAD)
+
+    argument_2 = Argument(False, item)
+    argument_2.add_premiss_couple_values(CriterionName.ENVIRONMENT_IMPACT, Value.VERY_BAD)
+    argument_2.add_premiss_comparison(CriterionName.ENVIRONMENT_IMPACT, CriterionName.CONSUMPTION)
+
+    negotiations.add_argument(agents[0], agents[1], argument_1)
+    negotiations.add_argument(agents[0], agents[1], argument_2)
 
     assert len(dict_[(agents[0], agents[1])]["arguments"])
     print("[INFO] Adding an argument to the list... OK!")
@@ -90,3 +143,10 @@ if __name__ == '__main__':
 
     assert negotiations.is_negotiation_ended(agents[0], agents[1]) is True
     print("[INFO] Negotion has ended successfully... OK!")
+
+    # Testing non redundancy of arguments
+    resp = negotiations.is_argument_already_used(agents[0], agents[1], argument_1)
+    assert resp is True
+    resp = negotiations.is_argument_already_used(agents[0], agents[1], argument_2)
+    assert resp is True
+    print("[INFO] Detecting redundancy in arguments... OK!")
