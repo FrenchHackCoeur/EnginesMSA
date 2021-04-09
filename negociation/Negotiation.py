@@ -28,7 +28,7 @@ class Negotiation:
         tuple_ = self.get_tuple(initiator, interlocutor)
         self._negotiations[tuple_]["initiator"] = initiator
 
-    def append_argument(self, initiator: str, interlocutor: str, argument: Argument):
+    def add_argument(self, initiator: str, interlocutor: str, argument: Argument):
         tuple_ = self.get_tuple(initiator, interlocutor)
         self._negotiations[tuple_]["arguments"].append(argument)
 
@@ -72,7 +72,7 @@ if __name__ == '__main__':
     print("[INFO] Starting a negotiation with Alice... OK!")
 
     # Trying to add an argument
-    negotiations.append_argument(agents[0], agents[1], Argument(False, item))
+    negotiations.add_argument(agents[0], agents[1], Argument(False, item))
 
     assert len(dict_[(agents[0], agents[1])]["arguments"])
     print("[INFO] Adding an argument to the list... OK!")

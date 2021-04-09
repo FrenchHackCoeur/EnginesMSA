@@ -61,7 +61,31 @@ class ArgumentAgent(CommunicatingAgent):
 
         return preference
 
+    def support_proposal(self, item) -> Tuple:
+        """
+        Used when the agent receives "ASK_WHY" after having proposed an item
+        :param item: str - name of the item which was proposed
+        :return: string - the strongest supportive argument
+        """
+        return self.list_supporting_proposal(item)[0]
 
+    def list_supporting_proposal(self, item) -> List[Tuple]:
+        """
+        Generate a list of premisses which can be used to support an item
+        :param item: Item - name of the item
+        :return: list of all premisses PRO an item (sorted by order of importance based on agent's preferences)
+        """
+        result = []
+        feelings_about_engine = self.preference.get_criterion_value_for_item(item)
+        preferences = self.preference.get_criterion_name_list()
+
+        for preference in preferences:
+            criterion_value = feelings_about_engine[preference]
+
+            if criterion_value == Value.VERY_GOOD or criterion_value == Value.GOOD:
+                result.append((preference, criterion_value))
+
+        return result
 
     def step(self):
         # Get a list of interlocutors with which the agent can talk about engines
@@ -108,6 +132,24 @@ class ArgumentAgent(CommunicatingAgent):
                         MessagePerformative.ASK_WHY,
                         engine
                     ))
+            elif performative == MessagePerformative.ASK_WHY:
+                # We get the engine proposed by an agent
+                engine = message.get_content()
+
+                # We send a message with commit performative
+                argument = Argument(True, engine)
+                argument.add_premiss_couple_values(*self.support_proposal(engine))
+
+                # Keeping argument in memory
+                self._negotiations.add_argument(self.get_name(), expeditor, argument)
+
+                self.send_message(Message(
+                    self.get_name(),
+                    expeditor,
+                    MessagePerformative.ARGUE,
+                    argument
+                ))
+
             elif performative == MessagePerformative.ACCEPT:
                 # We get the engine proposed by an agent
                 engine = message.get_content()
@@ -192,9 +234,9 @@ if __name__ == "__main__":
     # Creating a list that will contain the different engines used
     engines = [
         Item("Electric Engine", "An engine that works with electricity"),
-        # Item("Diesel Engine", "An engine that works with fuel"),
-        # Item("Hydrogen Engine", "An engine that works with hydrogen"),
-        # Item("Nuclear Engine", "To be used with caution")
+        Item("Diesel Engine", "An engine that works with fuel"),
+        Item("Hydrogen Engine", "An engine that works with hydrogen"),
+        Item("Nuclear Engine", "To be used with caution")
     ]
 
     # Creating our agents
