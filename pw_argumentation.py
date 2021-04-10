@@ -106,7 +106,7 @@ class ArgumentAgent(CommunicatingAgent):
 
         return result
 
-    def try_get_counter_argument(self, argument: Argument, interlocutor_id: str) -> Union[Argument, None]:
+    def try_get_counter_argument(self, argument: Argument, interlocutor_id: str) -> Union[Argument, Message, None]:
         def criterion_argument(premiss: CoupleValue, engine: Item, interlocutor_id: str) -> Union[Argument, None]:
             bad_values = self.list_attacking_proposal(engine)
             base_criterion = premiss.get_criterion_name()
@@ -177,10 +177,22 @@ class ArgumentAgent(CommunicatingAgent):
                 if counter_argument:
                     return counter_argument
 
-                # Otherwise we could propose our preferred engine because the value for this criterion is better
-                counter_argument = better_criterion_value(premiss, interlocutor_id)
-                if counter_argument:
-                    return counter_argument
+                # Another possibility is to propose our preferred engine if it has not already been mentioned
+                most_preferred_engine = self.preference.most_preferred(self._engines)
+
+                if not self._negotiations.has_engine_been_proposed(self.get_name(), interlocutor_id,
+                                                                   most_preferred_engine):
+                    return Message(
+                        self.get_name(),
+                        interlocutor_id,
+                        MessagePerformative.PROPOSE,
+                        most_preferred_engine
+                    )
+                else:
+                    # Otherwise we could search for a criterion that will justify the choice of our preferred engine
+                    counter_argument = better_criterion_value(premiss, interlocutor_id)
+                    if counter_argument:
+                        return counter_argument
 
             else:
                 premiss: CoupleValue = premisses[0]
@@ -191,11 +203,22 @@ class ArgumentAgent(CommunicatingAgent):
                 if counter_argument:
                     return counter_argument
 
-                # Otherwise we could counter an argument mentioning that for the same criterion our engine has a better
-                # value
-                counter_argument = better_criterion_value(premiss, interlocutor_id)
-                if counter_argument:
-                    return counter_argument
+                # Another possibility is to propose our preferred engine if it has not already been mentioned
+                most_preferred_engine = self.preference.most_preferred(self._engines)
+
+                if not self._negotiations.has_engine_been_proposed(self.get_name(), interlocutor_id, most_preferred_engine):
+                    return Message(
+                        self.get_name(),
+                        interlocutor_id,
+                        MessagePerformative.PROPOSE,
+                        most_preferred_engine
+                    )
+                else:
+                    # Otherwise we could search for a criterion that will justify the choice of our preferred engine
+                    counter_argument = better_criterion_value(premiss, interlocutor_id)
+                    if counter_argument:
+                        return counter_argument
+
         else:
             # First we need to get the comparison used by the other agent
             comparison: Comparison = premisses[1]
@@ -242,6 +265,10 @@ class ArgumentAgent(CommunicatingAgent):
         for message in new_messages:
             # We retrieve the expeditor
             expeditor = message.get_exp()
+
+            # We have to ensure that the negotiation with expeditor is still ongoing
+            if self._negotiations.is_negotiation_ended(self.get_name(), expeditor):
+                return
 
             # We now check the performative of the message and answer
             performative = message.get_performative()
@@ -299,9 +326,15 @@ class ArgumentAgent(CommunicatingAgent):
                 argument: Argument = message.get_content()
 
                 # Trying to get a counter argument
-                counter_argument = self.try_get_counter_argument(argument, expeditor)
+                resp = self.try_get_counter_argument(argument, expeditor)
 
-                if not counter_argument:
+                # Checking if the result of the previous function call is of type Message
+                if type(resp) == Message:
+                    self.send_message(resp)
+                    return
+
+                # Now we check if we have a counter_argument
+                if not resp:
                     # If the conclusion of the argument is in favor of a specific engine we have to accept it
                     if Argument.argument_parsing(argument)[0][0]:
                         self.send_message(Message(
@@ -314,14 +347,14 @@ class ArgumentAgent(CommunicatingAgent):
                     return
 
                 # Adding counter argument in our list of arguments used for negotiation
-                self._negotiations.add_argument(self.get_name(), expeditor, counter_argument)
+                self._negotiations.add_argument(self.get_name(), expeditor, resp)
 
                 # Sending counter argument
                 self.send_message(Message(
                     self.get_name(),
                     expeditor,
                     MessagePerformative.ARGUE,
-                    counter_argument
+                    resp
                 ))
             elif performative == MessagePerformative.ACCEPT:
                 # We get the engine proposed by an agent
@@ -410,7 +443,13 @@ if __name__ == "__main__":
         Item("Electric Engine", "An engine that works with electricity"),
         Item("Diesel Engine", "An engine that works with fuel"),
         Item("Hydrogen Engine", "An engine that works with hydrogen"),
-        Item("Nuclear Engine", "To be used with caution")
+        Item("Nuclear Engine", "To be used with caution"),
+        Item("Flat6", "The best engine built by Porsche"),
+        Item("V8AMG", "A very powerful engine"),
+        Item("RollsRoyce", "Engine used by the airbus A380"),
+        Item("WaterEngine", "A very interesting engine"),
+        Item("Clockwork engines", "An engine that relies on stored mechanical energy"),
+        Item("Ion drives", "A mix between a jet engine and an electrostatic one")
     ]
 
     # Creating our agents
@@ -423,4 +462,4 @@ if __name__ == "__main__":
     argument_model = ArgumentModel(agents_name)
 
     # Running
-    argument_model.run_n_step(10)
+    argument_model.run_n_step(20)

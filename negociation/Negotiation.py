@@ -22,7 +22,8 @@ class Negotiation:
                     "initiator": None,
                     "arguments": [],
                     "accepted_engine": None,
-                    "close_agreements": []
+                    "close_agreements": [],
+                    "engines_mentioned": {}
                 }
 
         return result
@@ -34,8 +35,13 @@ class Negotiation:
         tuple_ = self.get_tuple(initiator, interlocutor)
         self._negotiations[tuple_]["initiator"] = initiator
 
-    def add_argument(self, initiator: str, interlocutor: str, argument: Argument):
-        tuple_ = self.get_tuple(initiator, interlocutor)
+    def add_argument(self, agent_1: str, agent_2: str, argument: Argument):
+        tuple_ = self.get_tuple(agent_1, agent_2)
+        conclusion, _ = Argument.argument_parsing(argument)
+
+        # Saving the engine mentioned in the argument
+        self._add_engine(agent_1, agent_2, conclusion[1])
+
         self._negotiations[tuple_]["arguments"].append(argument)
 
     def has_started_negotiation(self, initiator: str, interlocutor: str) -> bool:
@@ -59,14 +65,22 @@ class Negotiation:
 
     def is_argument_already_used(self, agent_1: str, agent_2: str, argument: Argument) -> bool:
         tuple_ = self.get_tuple(agent_1, agent_2)
-        _, premisses = Argument.argument_parsing(argument)
+        conclusion, premisses = Argument.argument_parsing(argument)
         arguments = self._negotiations[tuple_]["arguments"]
 
         for index in range(len(arguments)):
             argument: Argument = arguments[index]
-            _, premisses_bis = Argument.argument_parsing(argument)
+            conclusion_bis, premisses_bis = Argument.argument_parsing(argument)
 
             if len(premisses) != len(premisses_bis):
+                continue
+
+            if conclusion[0] != conclusion_bis[0]:
+                # boolean decision are different
+                continue
+
+            if conclusion[1] != conclusion_bis[1]:
+                # mismatch concerning the engine
                 continue
 
             if len(premisses) == 1:
@@ -82,7 +96,7 @@ class Negotiation:
                 comparison: Comparison = premisses[1]
                 comparison_bis: Comparison = premisses_bis[1]
 
-                if couple_value.get_criterion_name() != couple_value.get_criterion_name():
+                if couple_value.get_criterion_name() != couple_value_bis.get_criterion_name():
                     continue
 
                 if comparison.get_best_criterion_name() != comparison_bis.get_best_criterion_name():
@@ -94,6 +108,15 @@ class Negotiation:
                 return True
 
         return False
+
+    def _add_engine(self, agent_1: str, agent_2: str, engine: Item):
+        tuple_ = self.get_tuple(agent_1, agent_2)
+        self._negotiations[tuple_]["engines_mentioned"][engine] = 1
+
+    def has_engine_been_proposed(self, agent_1: str, agent_2: str, engine: Item) -> bool:
+        tuple_ = self.get_tuple(agent_1, agent_2)
+        engines_mentioned = self._negotiations[tuple_]["engines_mentioned"]
+        return engine in engines_mentioned
 
 
 if __name__ == '__main__':
@@ -150,3 +173,10 @@ if __name__ == '__main__':
     resp = negotiations.is_argument_already_used(agents[0], agents[1], argument_2)
     assert resp is True
     print("[INFO] Detecting redundancy in arguments... OK!")
+
+    # Checking the function to determiner if an engine has already been discussed
+    resp = negotiations.has_engine_been_proposed(agents[0], agents[1], item)
+    assert resp is True
+    resp = negotiations.has_engine_been_proposed(agents[0], agents[2], item)
+    assert resp is False
+    print("[INFO] An agent can check if an engine has already been mentioned... OK!")
