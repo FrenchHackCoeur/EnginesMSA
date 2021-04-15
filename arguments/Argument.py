@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-from typing import List, Union
+from typing import List, Union, Tuple
+
 from arguments.Comparison import Comparison
 from arguments.CoupleValue import CoupleValue
-from preferences.CriterionName import CriterionName
-from preferences.Value import Value
 
+from preferences.Preferences import Preferences
+from preferences.CriterionName import CriterionName
+from preferences.Item import Item
+from preferences.Value import Value
 
 
 class Argument:
@@ -40,6 +43,11 @@ class Argument:
         """
         return self.__couple_values_list[0].get_criterion_name()
 
+    def add_premiss_couple_values(self, criterion_name, value):
+        """Add a premiss couple values in the couple values list.
+        """
+        self.__couple_values_list.append(CoupleValue(criterion_name, value))
+
     @staticmethod
     def argument_parsing(argument: 'Argument') -> List:
         return [
@@ -47,10 +55,56 @@ class Argument:
             [*argument.__couple_values_list, *argument.__comparison_list]
         ]
 
-    def add_premiss_couple_values(self, criterion_name, value):
-        """Add a premiss couple values in the couple values list.
+    @staticmethod
+    def support_proposal(item: Item, preferences: Preferences) -> Tuple:
         """
-        self.__couple_values_list.append(CoupleValue(criterion_name, value))
+        Used when the agent receives "ASK_WHY" after having proposed an item
+        :param item: str - name of the item which was proposed
+        :param preferences: Preferences - the preferences of an agent.
+        :return: string - the strongest supportive argument
+        """
+        return Argument.list_supporting_proposal(item, preferences)[0]
+
+    @staticmethod
+    def list_supporting_proposal(item: Item, preferences: Preferences) -> List[Tuple]:
+        """
+        Generate a list of premisses which can be used to support an item
+        :param
+            item: Item - name of the item
+            preference: Preferences - preferences of an agent
+        :return: list of all premisses PRO an item (sorted by order of importance based on agent's preferences)
+        """
+        result = []
+        feelings_about_engine = preferences.get_criterion_value_for_item(item)
+        criterion_preferences = preferences.get_criterion_name_list()
+
+        for preference in criterion_preferences:
+            criterion_value = feelings_about_engine[preference]
+
+            if criterion_value == Value.VERY_GOOD or criterion_value == Value.GOOD:
+                result.append((preference, criterion_value))
+
+        return result
+
+    @staticmethod
+    def list_attacking_proposal(item: Item, preferences: Preferences) -> List[Tuple]:
+        """
+        Generate a list of premisses which can be used to attack an item
+        :param item: Item - name of the item
+        :param preferences: Preferences - the preferences of an agent
+        :return: list of all premisses CON an item (sorted by order of importance based on preferences)
+        """
+        result = []
+        feelings_about_engine = preferences.get_criterion_value_for_item(item)
+        criterion_preferences = preferences.get_criterion_name_list()
+
+        for preference in criterion_preferences:
+            criterion_value = feelings_about_engine[preference]
+
+            if criterion_value == Value.VERY_BAD or criterion_value == Value.BAD:
+                result.append((preference, criterion_value))
+
+        return result
 
     def __str__(self):
         not_in_favor = 'not' if not self.__decision else ''

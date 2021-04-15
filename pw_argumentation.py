@@ -33,7 +33,7 @@ class ArgumentAgent(CommunicatingAgent):
     def __init__(self, unique_id, model: 'ArgumentModel', name, engine_models: List[Item]):
         super().__init__(unique_id, model, name)
         self._engines = engine_models
-        self.preference = self.generate_preferences(engine_models, CriterionName.to_list())
+        self.preference = ArgumentAgent._generate_preferences(engine_models, CriterionName.to_list())
         self.announce_existence_to_the_world = False
         self._df = model.get_directory_facilitator()
         self._negotiations = model.get_negotiations()
@@ -41,7 +41,8 @@ class ArgumentAgent(CommunicatingAgent):
     def get_preference(self):
         return self.preference
 
-    def generate_preferences(self, engine_models: List[Item], criteria: List[CriterionName]) -> Preferences:
+    @staticmethod
+    def _generate_preferences(engine_models: List[Item], criteria: List[CriterionName]) -> Preferences:
         # Creating the preference instance
         preference = Preferences()
 
@@ -62,57 +63,35 @@ class ArgumentAgent(CommunicatingAgent):
 
         return preference
 
-    def support_proposal(self, item) -> Tuple:
+    def try_get_counter_argument(self, argument: 'Argument', interlocutor_id: str) \
+            -> Union['Argument', Message, None]:
         """
-        Used when the agent receives "ASK_WHY" after having proposed an item
-        :param item: str - name of the item which was proposed
-        :return: string - the strongest supportive argument
+        Try to create an argument to counter the argument object that has been proposed by an agent.
+        :param argument: Argument - the argument for which we would like to create a counter one.
+        :param interlocutor_id: str - the identifier of the agent that has proposed the argument
+
+        :return: this function may return an argument to counter the one proposed by the agent with the identifier:
+        interlocutor_id. This counter argument can take the form of a message if the agent proposes its preferred_engine.
         """
-        return self.list_supporting_proposal(item)[0]
 
-    def list_supporting_proposal(self, item) -> List[Tuple]:
-        """
-        Generate a list of premisses which can be used to support an item
-        :param item: Item - name of the item
-        :return: list of all premisses PRO an item (sorted by order of importance based on agent's preferences)
-        """
-        result = []
-        feelings_about_engine = self.preference.get_criterion_value_for_item(item)
-        preferences = self.preference.get_criterion_name_list()
+        def criterion_argument(premiss: CoupleValue, engine: Item, interlocutor_id: str) -> \
+                Union[Argument, None]:
+            """
+            Try to return a counter argument that is built on the fact that the agent has found a criterion for which
+            the value for the engine is not good and the criterion is ranked higher in the list of preferences of the
+            agent compared to the one mentioned in the premiss.
 
-        for preference in preferences:
-            criterion_value = feelings_about_engine[preference]
+            :param premiss: CoupleValue - the premiss used by the agent with the identifier: interlocutor_id
+            :param engine: Item - The engine that is currently being discussed by the two agents
+            :param interlocutor_id: str - The identifier of the agent that has proposed the argument object.
 
-            if criterion_value == Value.VERY_GOOD or criterion_value == Value.GOOD:
-                result.append((preference, criterion_value))
-
-        return result
-
-    def list_attacking_proposal(self, item) -> List[Tuple]:
-        """
-        Generate a list of premisses which can be used to attack an item
-        :param item: Item - name of the item
-        :return: list of all premisses CON an item (sorted by order of importance based on preferences)
-        """
-        result = []
-        feelings_about_engine = self.preference.get_criterion_value_for_item(item)
-        preferences = self.preference.get_criterion_name_list()
-
-        for preference in preferences:
-            criterion_value = feelings_about_engine[preference]
-
-            if criterion_value == Value.VERY_BAD or criterion_value == Value.BAD:
-                result.append((preference, criterion_value))
-
-        return result
-
-    def try_get_counter_argument(self, argument: Argument, interlocutor_id: str) -> Union[Argument, Message, None]:
-        def criterion_argument(premiss: CoupleValue, engine: Item, interlocutor_id: str) -> Union[Argument, None]:
-            bad_values = self.list_attacking_proposal(engine)
+            :return: Possibly a counter argument to the one proposed by the agent with the identifier: interlocutor_id.
+            """
+            bad_criteria = Argument.list_attacking_proposal(engine, self.preference)
             base_criterion = premiss.get_criterion_name()
 
             # We iterate through our possible counter arguments to find if we could use one of them
-            for criterion_name, criterion_val in bad_values:
+            for criterion_name, criterion_val in bad_criteria:
 
                 if self.preference.is_preferred_criterion(criterion_name, base_criterion) and base_criterion != criterion_name:
                     argument = Argument(False, engine)
@@ -125,35 +104,42 @@ class ArgumentAgent(CommunicatingAgent):
                         return argument
             return None
 
-        def better_criterion_value(premiss: CoupleValue, interlocutor_id:str) -> Union[Argument, None]:
+        def criterion_value(premiss: CoupleValue, interlocutor_id: str, better_value: bool, engine: Item = None) -> \
+                Union[Argument, None]:
+            """
+            Try to return a counter argument that is built either on the fact that the agent has found that its preferred
+            engine has a better value for the criterion mentioned in the premiss used by its interlocutor or because the
+            engine that is currently being discussed has a value that is worst than the one mentioned in the premiss.
+
+            :param premiss: CoupleValue - the premiss used by the agent with the identifier: interlocutor_id
+            :param interlocutor_id: int - The identifier of the agent that has proposed the argument object.
+            :param better_value: str - A boolean to determine which approach to use.
+            :param engine: Item - The engine currently being discussed.
+
+            :return: Possibly a counter argument to the one proposed by the agent with the identifier: interlocutor_id.
+            """
+            argument = None
             preferred_engine = self.preference.most_preferred(self._engines)
-            value_for_criterion = self.preference.get_criterion_value_for_item(preferred_engine)[
-                premiss.get_criterion_name()]
+            value_for_criterion = self.preference.get_criterion_value_for_item(
+                preferred_engine if better_value else engine
+            )[premiss.get_criterion_name()]
 
-            if value_for_criterion > premiss.get_value():
-                argument = Argument(True, preferred_engine)
-                argument.add_premiss_couple_values(premiss.get_criterion_name(), value_for_criterion)
-                argument.add_premiss_comparison(value_for_criterion, premiss.get_value())
+            if better_value:
+                if value_for_criterion > premiss.get_value():
+                    argument = Argument(True, preferred_engine)
+                    argument.add_premiss_couple_values(premiss.get_criterion_name(), value_for_criterion)
+                    argument.add_premiss_comparison(value_for_criterion, premiss.get_value())
+            else:
+                assert engine is not None, "You forgot to specify the engine!"
+                if value_for_criterion < premiss.get_value():
+                    argument = Argument(False, engine)
+                    argument.add_premiss_couple_values(premiss.get_criterion_name(), value_for_criterion)
+                    argument.add_premiss_comparison(premiss.get_value(), value_for_criterion)
 
-                if not self._negotiations.is_argument_already_used(self.get_name(), interlocutor_id, argument):
-                    return argument
+            if argument and self._negotiations.is_argument_already_used(self.get_name(), interlocutor_id, argument):
+                return None
 
-            return None
-
-        def worst_criterion_value(engine: Item, premiss: CoupleValue, interlocutor_id:str) -> Union[Argument, None]:
-            preferred_engine = self.preference.most_preferred(self._engines)
-            value_for_criterion = self.preference.get_criterion_value_for_item(preferred_engine)[
-                premiss.get_criterion_name()]
-
-            if value_for_criterion < premiss.get_value():
-                argument = Argument(False, engine)
-                argument.add_premiss_couple_values(premiss.get_criterion_name(), value_for_criterion)
-                argument.add_premiss_comparison(premiss.get_value(), value_for_criterion)
-
-                if not self._negotiations.is_argument_already_used(self.get_name(), interlocutor_id, argument):
-                    return argument
-
-            return None
+            return argument
 
         conclusion, premisses = Argument.argument_parsing(argument)
 
@@ -173,7 +159,7 @@ class ArgumentAgent(CommunicatingAgent):
 
                 # Otherwise we could counter this argument by mentioning that for us this engine is not great for this
                 # criterion
-                counter_argument = worst_criterion_value(engine, premiss, interlocutor_id)
+                counter_argument = criterion_value(premiss, interlocutor_id, better_value=False, engine=engine)
                 if counter_argument:
                     return counter_argument
 
@@ -190,7 +176,7 @@ class ArgumentAgent(CommunicatingAgent):
                     )
                 else:
                     # Otherwise we could search for a criterion that will justify the choice of our preferred engine
-                    counter_argument = better_criterion_value(premiss, interlocutor_id)
+                    counter_argument = criterion_value(premiss, interlocutor_id, better_value=True)
                     if counter_argument:
                         return counter_argument
 
@@ -215,7 +201,7 @@ class ArgumentAgent(CommunicatingAgent):
                     )
                 else:
                     # Otherwise we could search for a criterion that will justify the choice of our preferred engine
-                    counter_argument = better_criterion_value(premiss, interlocutor_id)
+                    counter_argument = criterion_value(premiss, interlocutor_id, better_value=True)
                     if counter_argument:
                         return counter_argument
 
@@ -224,7 +210,7 @@ class ArgumentAgent(CommunicatingAgent):
             comparison: Comparison = premisses[1]
 
             # Getting proposals that we could use to defend our engine
-            proposals = self.list_supporting_proposal(engine)
+            proposals = Argument.list_supporting_proposal(engine, self.preference)
 
             # Then we need to check if the comparison is based on criterion
             if type(comparison.get_best_criterion_name()) == CriterionName:
@@ -310,7 +296,7 @@ class ArgumentAgent(CommunicatingAgent):
 
                 # We send a message with commit performative
                 argument = Argument(True, engine)
-                argument.add_premiss_couple_values(*self.support_proposal(engine))
+                argument.add_premiss_couple_values(*Argument.support_proposal(engine, self.preference))
 
                 # Keeping argument in memory
                 self._negotiations.add_argument(self.get_name(), expeditor, argument)
@@ -386,17 +372,20 @@ class ArgumentAgent(CommunicatingAgent):
                         engine
                     ))
 
+            # We indicate that the agent has now treated its business with the expeditor agent
+            engines_interlocutors.remove(expeditor)
+
         # We now iterate through the list of interlocutors for which we have not received a message
-        for interlocutor in engines_interlocutors:
+        for interlocutor_id in engines_interlocutors:
             # We check if a _negotiation has already started between the two agents
-            if not self._negotiations.has_started_negotiation(self.get_name(), interlocutor):
+            if not self._negotiations.has_started_negotiation(self.get_name(), interlocutor_id):
                 # If it's not the case, we initiate a negotiation between the two agents
-                self._negotiations.start_negotiation(self.get_name(), interlocutor)
+                self._negotiations.start_negotiation(self.get_name(), interlocutor_id)
 
                 # The current agent will propose his/her best engine based on his/her preferences
                 self.send_message(Message(
                     self.get_name(),
-                    interlocutor,
+                    interlocutor_id,
                     MessagePerformative.PROPOSE,
                     self.preference.most_preferred(self._engines)
                 ))
@@ -409,15 +398,18 @@ class ArgumentModel(Model):
 
     def __init__(self, agents_name: List[str]):
         super().__init__()
-        self._negotiations = Negotiation(agents_name)
         self.schedule = RandomActivation(self)
         self.__messages_service = MessageService(self.schedule)
         self._df = DirectoryFacilitator()
         self._df.add_role(Role.EnginesTalker)
         self.running = True
+        self._negotiations = Negotiation(agents_name)
+
+        agents_identifier = []
 
         for index, agent_name in enumerate(agents_name):
             agent = ArgumentAgent(index, self, agent_name, engines)
+            agents_identifier.append(index)
             self.schedule.add(agent)
             self._df.attach_a_role_to_agent(Role.EnginesTalker, agent.get_name())
 

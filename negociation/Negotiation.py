@@ -40,7 +40,7 @@ class Negotiation:
         return result
 
     @staticmethod
-    def _get_tuple(agent_1: int, agent_2: int) -> Tuple:
+    def _get_tuple(agent_1: str, agent_2: str) -> Tuple:
         """
         This function aims to create a key to access a negotiation object
 
@@ -53,7 +53,7 @@ class Negotiation:
         """
         return (agent_1, agent_2) if agent_1 < agent_2 else (agent_2, agent_1)
 
-    def start_negotiation(self, initiator: int, interlocutor: int):
+    def start_negotiation(self, initiator: str, interlocutor: str):
         """
         The purpose of this function is to start a negotiation between two agents to discuss engines. The negotiation
         will end when both agents agree on a motor M.
@@ -66,7 +66,7 @@ class Negotiation:
         tuple_ = Negotiation._get_tuple(initiator, interlocutor)
         self._negotiations[tuple_]["initiator"] = initiator
 
-    def add_argument(self, agent_1: int, agent_2: int, argument: Argument):
+    def add_argument(self, agent_1: str, agent_2: str, argument: Argument):
         """
         This function aims to add an argument that has been mentioned by agent_1 during the negotiation process.
 
@@ -85,7 +85,7 @@ class Negotiation:
 
         self._negotiations[tuple_]["arguments"].append((agent_1, argument))
 
-    def has_started_negotiation(self, agent_1: int, agent_2: int) -> bool:
+    def has_started_negotiation(self, agent_1: str, agent_2: str) -> bool:
         """
         This function aims to check whether or not a negotiation process has started between two agents.
 
@@ -103,7 +103,7 @@ class Negotiation:
 
         return False
 
-    def set_accepted_engine(self, agent_1: int, agent_2: int, engine: Item):
+    def set_accepted_engine(self, agent_1: str, agent_2: str, engine: Item):
         """
         This function aims to store the engine that has been retained by the two agents.
 
@@ -116,7 +116,7 @@ class Negotiation:
         tuple_ = Negotiation._get_tuple(agent_1, agent_2)
         self._negotiations[tuple_]["accepted_engine"] = engine
 
-    def accept_ending_negotiation(self, agent_1: int, agent_2: int):
+    def accept_ending_negotiation(self, agent_1: str, agent_2: str):
         """
         This function aims to indicate that agent_1 is in favor of stopping the negotiation. This way of thinking is
         highly inspired by the three hand shakes protocol used in TCP.
@@ -128,7 +128,7 @@ class Negotiation:
         tuple_ = Negotiation._get_tuple(agent_1, agent_2)
         self._negotiations[tuple_]["close_agreements"].append(agent_1)
 
-    def is_negotiation_ended(self, agent_1: int, agent_2: int) -> bool:
+    def is_negotiation_ended(self, agent_1: str, agent_2: str) -> bool:
         """
         This function aims to check whether or not the two agents have already agreed on a specific engine.
 
@@ -143,7 +143,7 @@ class Negotiation:
         tuple_ = Negotiation._get_tuple(agent_1, agent_2)
         return len(self._negotiations[tuple_]["close_agreements"]) == 2
 
-    def is_argument_already_used(self, agent_1: int, agent_2: int, argument: Argument) -> bool:
+    def is_argument_already_used(self, agent_1: str, agent_2: str, argument: Argument) -> bool:
         """
         This function aims to check whether or not the argument object has already been used in the negotiation process
         between agent_1 and agent_2.
@@ -202,7 +202,7 @@ class Negotiation:
 
         return False
 
-    def _add_engine(self, agent_1: int, agent_2: int, engine: Item):
+    def _add_engine(self, agent_1: str, agent_2: str, engine: Item):
         """
         This function aims to store in memory an engine that has been discussed between two agents.
 
@@ -215,7 +215,7 @@ class Negotiation:
         tuple_ = Negotiation._get_tuple(agent_1, agent_2)
         self._negotiations[tuple_]["engines_mentioned"][engine] = 1
 
-    def has_engine_been_proposed(self, agent_1: int, agent_2: int, engine: Item) -> bool:
+    def has_engine_been_proposed(self, agent_1: str, agent_2: str, engine: Item) -> bool:
         """
         This function aims to check whether or not an engine has been mentioned during a negotiation process.
 
@@ -238,22 +238,17 @@ class Negotiation:
 if __name__ == '__main__':
     agents = ["Alice", "Bob", "Hugo"]
     item = Item("Electric Engine", "An engine that works with electricity")
-    negotiations = Negotiation(list(range(len(agents))))
+    negotiations = Negotiation(agents)
 
     # Testing structure of the dictionary
     dict_ = negotiations._negotiations
     assert len(list(dict_.keys())) == len(agents)
-    try:
-        obj_ = dict_[(0, 1)]
-    except Exception as err:
-        print(err)
-        exit(0)
 
     print("[INFO] Structure of the dictionary is correct ... OK!")
     # Trying to start a negotiation
-    negotiations.start_negotiation(1, 0)
+    negotiations.start_negotiation(agents[0], agents[1])
 
-    assert dict_[(0, 1)]["initiator"] == 1
+    assert dict_[(agents[0], agents[1])]["initiator"] == agents[0]
     print("[INFO] Starting a negotiation with Alice... OK!")
 
     # Trying to add an argument
@@ -264,36 +259,36 @@ if __name__ == '__main__':
     argument_2.add_premiss_couple_values(CriterionName.ENVIRONMENT_IMPACT, Value.VERY_BAD)
     argument_2.add_premiss_comparison(CriterionName.ENVIRONMENT_IMPACT, CriterionName.CONSUMPTION)
 
-    negotiations.add_argument(0, 1, argument_1)
-    negotiations.add_argument(0, 1, argument_2)
+    negotiations.add_argument(agents[0], agents[1], argument_1)
+    negotiations.add_argument(agents[0], agents[1], argument_2)
 
-    assert len(dict_[(0, 1)]["arguments"])
+    assert len(dict_[(agents[0], agents[1])]["arguments"])
     print("[INFO] Adding an argument to the list... OK!")
 
     # Testing function to determine if a negotiation has started with a specific interlocutor
-    res = negotiations.has_started_negotiation(0, 2)
-    res_2 = negotiations.has_started_negotiation(0, 1)
+    res = negotiations.has_started_negotiation(agents[0], agents[2])
+    res_2 = negotiations.has_started_negotiation(agents[0], agents[1])
     assert res is False
     assert res_2 is True
     print("[INFO] Function has_started_negotiation works correctly... OK!")
 
     # Testing ending a negotiation
-    negotiations.accept_ending_negotiation(0, 1)
-    negotiations.accept_ending_negotiation(1, 0)
+    negotiations.accept_ending_negotiation(agents[0], agents[1])
+    negotiations.accept_ending_negotiation(agents[1], agents[0])
 
-    assert negotiations.is_negotiation_ended(0, 1) is True
+    assert negotiations.is_negotiation_ended(agents[0], agents[1]) is True
     print("[INFO] Negotiation has ended successfully... OK!")
 
     # Testing non redundancy of arguments
-    resp = negotiations.is_argument_already_used(0, 1, argument_1)
+    resp = negotiations.is_argument_already_used(agents[0], agents[1], argument_1)
     assert resp is True
-    resp = negotiations.is_argument_already_used(0, 1, argument_2)
+    resp = negotiations.is_argument_already_used(agents[0], agents[1], argument_2)
     assert resp is True
     print("[INFO] Detecting redundancy in arguments... OK!")
 
     # Checking the function to determiner if an engine has already been discussed
-    resp = negotiations.has_engine_been_proposed(0, 1, item)
+    resp = negotiations.has_engine_been_proposed(agents[0], agents[1], item)
     assert resp is True
-    resp = negotiations.has_engine_been_proposed(0, 2, item)
+    resp = negotiations.has_engine_been_proposed(agents[0], agents[2], item)
     assert resp is False
     print("[INFO] An agent can check if an engine has already been mentioned... OK!")

@@ -18,11 +18,11 @@ class DirectoryFacilitator:
         """
         self.df_[role].append(agent_id)
 
-    def get_agents_with_specific_role(self, requester_name: str, role: Role) -> Set[str]:
+    def get_agents_with_specific_role(self, requester_id: str, role: Role) -> Set[str]:
         """
         Return a list of agents with a specific role.
         """
-        return set([agent_id for agent_id in self.df_[role] if agent_id != requester_name])
+        return set([agent_id for agent_id in self.df_[role] if agent_id != requester_id])
 
 
 if __name__ == '__main__':
@@ -41,13 +41,13 @@ if __name__ == '__main__':
     print("[INFO] Method get_agents_with_specific_role should return  0 agent... OK ")
 
     # Test to add a role to a specific agent
-    agent_1 = "AgentSmith"
-    agent_2 = "AgentPamela"
+    agent_1 = 0
+    agent_2 = 1
 
     df.attach_a_role_to_agent(Role.EnginesTalker, agent_1)
     df.attach_a_role_to_agent(Role.EnginesTalker, agent_2)
 
-    interlocutors = df.get_agents_with_specific_role('', Role.EnginesTalker)
+    interlocutors = df.get_agents_with_specific_role(4, Role.EnginesTalker)
 
     assert len(interlocutors) == 2
     print("[INFO] Method get_agents_with_specific_role should return 2 agents... OK")
