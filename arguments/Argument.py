@@ -106,6 +106,53 @@ class Argument:
 
         return result
 
+    def __eq__(self, other) -> bool:
+        """Overrides the default implementation"""
+        if self is other:
+            return True
+
+        if isinstance(other, Argument):
+            # Then we check if the the two objects talk about the same engine
+            if self.__item != other.__item:
+                return False
+
+            # We also need to verify the decision (ie the argument is in favor of the engine or not)
+            if self.__decision != other.__decision:
+                return False
+
+            # Then we check if the two objects have the same number of premisses of type comparison
+            if len(self.__comparison_list) == len(other.__comparison_list):
+                if len(self.__comparison_list) != 0:
+                    comparison_1 = self.__comparison_list[0]
+                    comparison_2 = other.__comparison_list[0]
+
+                    if type(comparison_1.get_best_criterion_name()) != type(comparison_2.get_best_criterion_name()):
+                        return False
+
+                    if comparison_1.get_best_criterion_name() != comparison_2.get_best_criterion_name():
+                        return False
+
+                    if comparison_1.get_worst_criterion_name() != comparison_2.get_worst_criterion_name():
+                        return False
+            else:
+                return False
+
+            # Finally we check if the two objects have the same number of premisses of type couple value
+            if len(self.__couple_values_list) == len(other.__couple_values_list):
+                if len(self.__couple_values_list) != 0:
+                    cp_1 = self.__couple_values_list[0]
+                    cp_2 = other.__couple_values_list[0]
+
+                    if cp_1.get_criterion_name() != cp_2.get_criterion_name():
+                        return False
+
+                    if cp_1.get_value() != cp_2.get_value():
+                        return False
+            else:
+                return False
+            return True
+        return NotImplemented
+
     def __str__(self):
         not_in_favor = 'not' if not self.__decision else ''
 
@@ -121,3 +168,42 @@ class Argument:
         string += ")"
 
         return string
+
+
+if __name__ == "__main__":
+    engine = Item("Porsche", "An engine from Stuttgart")
+
+    argument_1 = Argument(True, engine)
+    argument_2 = Argument(False, engine)
+
+    assert argument_1 != argument_2
+    argument_2 = Argument(True, engine)
+    assert argument_1 == argument_2
+    print("[INFO] Simple equality check ... OK!")
+
+    argument_1.add_premiss_couple_values(CriterionName.ENVIRONMENT_IMPACT, Value.VERY_GOOD)
+    argument_2.add_premiss_couple_values(CriterionName.ENVIRONMENT_IMPACT, Value.GOOD)
+
+    assert argument_1 != argument_2
+    argument_2 = Argument(True, engine)
+    argument_2.add_premiss_couple_values(CriterionName.ENVIRONMENT_IMPACT, Value.VERY_GOOD)
+    assert argument_1 == argument_2
+
+    print("[INFO] Equality with couple value... OK!")
+
+    argument_1.add_premiss_comparison(CriterionName.CONSUMPTION, CriterionName.ENVIRONMENT_IMPACT)
+    argument_2.add_premiss_comparison(CriterionName.DURABILITY, CriterionName.NOISE)
+
+    assert argument_1 != argument_2
+    argument_2 = Argument(True, engine)
+    argument_2.add_premiss_couple_values(CriterionName.ENVIRONMENT_IMPACT, Value.VERY_GOOD)
+    argument_2.add_premiss_comparison(CriterionName.CONSUMPTION, CriterionName.ENVIRONMENT_IMPACT)
+    assert argument_1 == argument_2
+    print("[INFO] Equality with comparison... OK!")
+
+    argument_2 = Argument(True, engine)
+    argument_2.add_premiss_couple_values(CriterionName.ENVIRONMENT_IMPACT, Value.VERY_GOOD)
+    argument_2.add_premiss_comparison(Value.VERY_GOOD, Value.GOOD)
+
+    assert argument_1 != argument_2
+    print("[INFO] Testing type difference ... OK!")

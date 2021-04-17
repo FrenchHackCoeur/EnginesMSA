@@ -142,68 +142,45 @@ class ArgumentAgent(CommunicatingAgent):
             return argument
 
         conclusion, premisses = Argument.argument_parsing(argument)
+        most_preferred_engine = self.preference.most_preferred(self._engines)
 
         # Getting engine mentioned in the argument
         engine = conclusion[1]
 
         # Checking if the argument was in favor of a specific engine or not
         if conclusion[0]:
-            if len(premisses) == 2:
-                premiss: CoupleValue = premisses[0]
+            premiss_cp: CoupleValue = premisses[0]
 
-                # We try to find a criterion that has a higher rank in our table of preferences and prove that the value
-                # is not great
-                counter_argument = criterion_argument(premiss, engine, interlocutor_id)
+            # We try to find a criterion that has a higher rank in our table of preferences and prove that the value
+            # is not great
+            counter_argument = criterion_argument(premiss_cp, engine, interlocutor_id)
+            if counter_argument:
+                return counter_argument
+
+            # Otherwise we could counter this argument by mentioning that for us this engine is not great for this
+            # criterion
+            counter_argument = criterion_value(premiss_cp, interlocutor_id, better_value=False, engine=engine)
+            if counter_argument:
+                return counter_argument
+
+            # Another possibility is to propose our preferred engine if it has not already been mentioned
+            if self._negotiations.has_engine_been_proposed(self.get_name(), interlocutor_id,
+                                                              most_preferred_engine):
+
+                # Otherwise we could search for a criterion that will justify the choice of our preferred engine
+                counter_argument = criterion_value(premiss_cp, interlocutor_id, better_value=True)
                 if counter_argument:
                     return counter_argument
-
-                # Otherwise we could counter this argument by mentioning that for us this engine is not great for this
-                # criterion
-                counter_argument = criterion_value(premiss, interlocutor_id, better_value=False, engine=engine)
-                if counter_argument:
-                    return counter_argument
-
-                # Another possibility is to propose our preferred engine if it has not already been mentioned
-                most_preferred_engine = self.preference.most_preferred(self._engines)
-
-                if not self._negotiations.has_engine_been_proposed(self.get_name(), interlocutor_id,
-                                                                   most_preferred_engine):
-                    return Message(
-                        self.get_name(),
-                        interlocutor_id,
-                        MessagePerformative.PROPOSE,
-                        most_preferred_engine
-                    )
-                else:
-                    # Otherwise we could search for a criterion that will justify the choice of our preferred engine
-                    counter_argument = criterion_value(premiss, interlocutor_id, better_value=True)
-                    if counter_argument:
-                        return counter_argument
-
             else:
-                premiss: CoupleValue = premisses[0]
+                # We register our engine
+                self._negotiations.add_engine(self.get_name(), interlocutor_id, most_preferred_engine)
 
-                # We try to find a criterion that has a higher rank in our table of preferences and prove that the value
-                # is not great
-                counter_argument = criterion_argument(premiss, engine, interlocutor_id)
-                if counter_argument:
-                    return counter_argument
-
-                # Another possibility is to propose our preferred engine if it has not already been mentioned
-                most_preferred_engine = self.preference.most_preferred(self._engines)
-
-                if not self._negotiations.has_engine_been_proposed(self.get_name(), interlocutor_id, most_preferred_engine):
-                    return Message(
-                        self.get_name(),
-                        interlocutor_id,
-                        MessagePerformative.PROPOSE,
-                        most_preferred_engine
-                    )
-                else:
-                    # Otherwise we could search for a criterion that will justify the choice of our preferred engine
-                    counter_argument = criterion_value(premiss, interlocutor_id, better_value=True)
-                    if counter_argument:
-                        return counter_argument
+                return Message(
+                    self.get_name(),
+                    interlocutor_id,
+                    MessagePerformative.PROPOSE,
+                    most_preferred_engine
+                )
 
         else:
             # First we need to get the comparison used by the other agent
@@ -276,12 +253,25 @@ class ArgumentAgent(CommunicatingAgent):
                             engine
                         ))
                     else:
-                        self.send_message(Message(
-                            self.get_name(),
-                            expeditor,
-                            MessagePerformative.PROPOSE,
-                            most_preferred_engine
-                        ))
+                        if self._negotiations.has_engine_been_proposed(self.get_name(), expeditor, most_preferred_engine):
+                            # If the most preferred engine has been proposed,
+                            # the agent will ask why the other agent proposed this engine
+                            self.send_message(Message(
+                                self.get_name(),
+                                expeditor,
+                                MessagePerformative.ASK_WHY,
+                                engine
+                            ))
+                        else:
+                            # We register our engine
+                            self._negotiations.add_engine(self.get_name(), expeditor, most_preferred_engine)
+
+                            self.send_message(Message(
+                                self.get_name(),
+                                expeditor,
+                                MessagePerformative.PROPOSE,
+                                most_preferred_engine
+                            ))
                 else:
                     # Otherwise the agent will ask why the other agent proposed this engine
                     self.send_message(Message(
@@ -329,7 +319,28 @@ class ArgumentAgent(CommunicatingAgent):
                             MessagePerformative.ACCEPT,
                             Argument.argument_parsing(argument)[0][1]
                         ))
-                    # We cannot argue anymore
+                    else:
+                        # We have to accept the engine of the other agent as the current agent was not able to propose
+                        # another argument in favor of its most preferred engine.
+
+                        # We try to get the engine mentioned by the other interlocutor
+                        engine_ = self._negotiations.get_engine_proposed_by_interlocutor(self.get_name(), expeditor)
+                        if engine_:
+                            self.send_message(Message(
+                                self.get_name(),
+                                expeditor,
+                                MessagePerformative.ACCEPT,
+                                engine_
+                            ))
+                        else:
+                            # If this engine has not been discussed during the negotiation,
+                            # we have to ask the interlocutor
+                            self.send_message(Message(
+                                self.get_name(),
+                                expeditor,
+                                MessagePerformative.QUERY_REF,
+                                "engine"
+                            ))
                     return
 
                 # Adding counter argument in our list of arguments used for negotiation
@@ -371,6 +382,22 @@ class ArgumentAgent(CommunicatingAgent):
                         MessagePerformative.COMMIT,
                         engine
                     ))
+            elif performative == MessagePerformative.QUERY_REF:
+                self.send_message(Message(
+                    self.get_name(),
+                    expeditor,
+                    MessagePerformative.INFORM_REF,
+                    self.preference.most_preferred(self._engines)
+                ))
+            elif performative == MessagePerformative.INFORM_REF:
+                engine = message.get_content()
+
+                self.send_message(Message(
+                    self.get_name(),
+                    expeditor,
+                    MessagePerformative.ACCEPT,
+                    engine
+                ))
 
             # We indicate that the agent has now treated its business with the expeditor agent
             engines_interlocutors.remove(expeditor)
@@ -382,12 +409,18 @@ class ArgumentAgent(CommunicatingAgent):
                 # If it's not the case, we initiate a negotiation between the two agents
                 self._negotiations.start_negotiation(self.get_name(), interlocutor_id)
 
+                # We retrieve our most preferred engine
+                most_preferred_engine = self.preference.most_preferred(self._engines)
+
+                # We have to register our preferred engine
+                self._negotiations.add_engine(self.get_name(), interlocutor_id, most_preferred_engine)
+
                 # The current agent will propose his/her best engine based on his/her preferences
                 self.send_message(Message(
                     self.get_name(),
                     interlocutor_id,
                     MessagePerformative.PROPOSE,
-                    self.preference.most_preferred(self._engines)
+                    most_preferred_engine
                 ))
 
 
@@ -454,4 +487,4 @@ if __name__ == "__main__":
     argument_model = ArgumentModel(agents_name)
 
     # Running
-    argument_model.run_n_step(20)
+    argument_model.run_n_step(100)

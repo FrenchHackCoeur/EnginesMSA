@@ -45,3 +45,18 @@ class Item:
             sum_result = sum_result + criterion_weight * self.get_value(preferences, criterion_name).value
             criterion_weight = criterion_weight / 2
         return sum_result
+
+    def __eq__(self, other) -> bool:
+        """Overrides the default implementation"""
+        if self is other:
+            return True
+
+        if isinstance(other, Item):
+            if self.__name != other.__name:
+                return False
+
+            if self.__description != other.__description:
+                return False
+
+            return True
+        return NotImplemented

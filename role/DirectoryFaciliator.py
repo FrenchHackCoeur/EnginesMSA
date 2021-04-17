@@ -1,5 +1,5 @@
 from role.Role import Role
-from typing import Dict, List, Set, TYPE_CHECKING
+from typing import Dict, List, Set
 
 
 class DirectoryFacilitator:

@@ -1,9 +1,6 @@
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from preferences.Item import Item
 from arguments.Argument import Argument
-
-from arguments.CoupleValue import CoupleValue
-from arguments.Comparison import Comparison
 
 from preferences.CriterionName import CriterionName
 from preferences.Value import Value
@@ -80,9 +77,6 @@ class Negotiation:
         tuple_ = Negotiation._get_tuple(agent_1, agent_2)
         conclusion, _ = Argument.argument_parsing(argument)
 
-        # Saving the engine mentioned in the argument
-        self._add_engine(agent_1, agent_2, conclusion[1])
-
         self._negotiations[tuple_]["arguments"].append((agent_1, argument))
 
     def has_started_negotiation(self, agent_1: str, agent_2: str) -> bool:
@@ -158,51 +152,17 @@ class Negotiation:
             negotiation.
         """
         tuple_ = Negotiation._get_tuple(agent_1, agent_2)
-        conclusion, premisses = Argument.argument_parsing(argument)
         arguments = self._negotiations[tuple_]["arguments"]
 
         for index in range(len(arguments)):
-            argument: Argument = arguments[index][1]
-            conclusion_bis, premisses_bis = Argument.argument_parsing(argument)
+            argument_bis: Argument = arguments[index][1]
 
-            if len(premisses) != len(premisses_bis):
-                continue
-
-            if conclusion[0] != conclusion_bis[0]:
-                # boolean decision are different
-                continue
-
-            if conclusion[1] != conclusion_bis[1]:
-                # mismatch concerning the engine
-                continue
-
-            if len(premisses) == 1:
-                couple_value: CoupleValue = premisses[0]
-                couple_value_bis: CoupleValue = premisses_bis[0]
-
-                if couple_value.get_criterion_name() == couple_value_bis.get_criterion_name():
-                    return True
-            else:
-                couple_value: CoupleValue = premisses[0]
-                couple_value_bis: CoupleValue = premisses_bis[0]
-
-                comparison: Comparison = premisses[1]
-                comparison_bis: Comparison = premisses_bis[1]
-
-                if couple_value.get_criterion_name() != couple_value_bis.get_criterion_name():
-                    continue
-
-                if comparison.get_best_criterion_name() != comparison_bis.get_best_criterion_name():
-                    continue
-
-                if comparison.get_worst_criterion_name() != comparison_bis.get_worst_criterion_name():
-                    continue
-
+            if argument == argument_bis:
                 return True
 
         return False
 
-    def _add_engine(self, agent_1: str, agent_2: str, engine: Item):
+    def add_engine(self, agent_1: str, agent_2: str, engine: Item):
         """
         This function aims to store in memory an engine that has been discussed between two agents.
 
@@ -213,7 +173,27 @@ class Negotiation:
 
         """
         tuple_ = Negotiation._get_tuple(agent_1, agent_2)
-        self._negotiations[tuple_]["engines_mentioned"][engine] = 1
+        self._negotiations[tuple_]["engines_mentioned"][agent_1] = engine
+
+    def get_engine_proposed_by_interlocutor(self, agent_1: str, agent_2: str) -> Union[Item, None]:
+        """
+        This function aims to return the engine proposed by agent_1
+
+        Parameters:
+            - agent_1 (int): The identifier of one the two agents involved in a specific negotiation T.
+            - agent_2 (int): The identifier of the second agent involved in the negotiation T.
+
+        Returns:
+            The engine proposed by agent_1.
+
+        """
+        tuple_ = Negotiation._get_tuple(agent_1, agent_2)
+
+        for agent, engine_ in self._negotiations[tuple_]["engines_mentioned"].items():
+            if agent == agent_2:
+                return engine_
+
+        return None
 
     def has_engine_been_proposed(self, agent_1: str, agent_2: str, engine: Item) -> bool:
         """
@@ -231,8 +211,12 @@ class Negotiation:
         """
 
         tuple_ = Negotiation._get_tuple(agent_1, agent_2)
-        engines_mentioned = self._negotiations[tuple_]["engines_mentioned"]
-        return engine in engines_mentioned
+
+        for agent, engine_ in self._negotiations[tuple_]["engines_mentioned"].items():
+
+            if engine_ == engine:
+                return True
+        return False
 
 
 if __name__ == '__main__':
@@ -292,3 +276,9 @@ if __name__ == '__main__':
     resp = negotiations.has_engine_been_proposed(agents[0], agents[2], item)
     assert resp is False
     print("[INFO] An agent can check if an engine has already been mentioned... OK!")
+
+    # Checking that we can retrieve the engine proposed by an agent
+    negotiations.add_engine(agents[0], agents[1], item)
+    item_proposed_by_agent_0 = negotiations.get_engine_proposed_by_interlocutor(agents[1], agents[0])
+    assert item_proposed_by_agent_0 == item
+    print("[INFO] An agent can retrieve the engine that the other proposed ... OK!")
